@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Press+Start+2P&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom retro/terminal styles */
+@layer base {
+  body {
+    @apply bg-terminal-bg text-terminal-text font-mono;
+    margin: 0;
+    overflow: hidden;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .terminal-window {
+    @apply bg-black border-2 border-terminal-primary rounded-lg;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+  }
+  
+  .pixel-border {
+    border-image: 
+      linear-gradient(45deg, #00ff41, #00d4aa, #8b5cf6) 1;
+    border-width: 2px;
+    border-style: solid;
+  }
+  
+  .glitch-text {
+    @apply relative;
+  }
+  
+  .glitch-text::before,
+  .glitch-text::after {
+    @apply absolute top-0 left-0 w-full h-full;
+    content: attr(data-text);
+  }
+  
+  .glitch-text::before {
+    @apply text-red-500;
+    animation: glitch 0.3s infinite;
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+  }
+  
+  .glitch-text::after {
+    @apply text-blue-500;
+    animation: glitch 0.3s infinite reverse;
+    clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+  }
+  
+  .neon-glow {
+    text-shadow: 
+      0 0 5px currentColor,
+      0 0 10px currentColor,
+      0 0 15px currentColor,
+      0 0 20px #00ff41;
+  }
+  
+  .typing-animation {
+    overflow: hidden;
+    border-right: 2px solid #00ff41;
+    white-space: nowrap;
+    animation: type 3.5s steps(40, end), blink-caret 0.75s step-end infinite;
+  }
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: #00ff41; }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.scan-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00ff41, transparent);
+  animation: scan-line 2s linear infinite;
+  z-index: 1000;
+}
+
+/* Terminal scrollbar */
+.terminal-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-track {
+  background: #0a0e1a;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: #00ff41;
+  border-radius: 4px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #00d4aa;
+}

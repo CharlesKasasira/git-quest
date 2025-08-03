@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  git-quest-dev:
+    image: node:18-alpine
+    container_name: git-quest-dev
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - git-quest-network
+
+networks:
+  git-quest-network:
+    driver: bridge 
