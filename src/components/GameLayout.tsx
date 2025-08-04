@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import TimelinePanel from './TimelinePanel';
 import TerminalPanel from './TerminalPanel';
 import GameHeader from './GameHeader';
@@ -11,12 +11,12 @@ const GameLayout = memo(function GameLayout() {
 
   // Keyboard navigation to focus terminal
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = () => {
       // Focus terminal on any key press (except when already focused on input elements)
       const activeElement = document.activeElement;
       const isInputElement = activeElement?.tagName === 'INPUT' || 
                            activeElement?.tagName === 'TEXTAREA' || 
-                           activeElement?.contentEditable === 'true';
+                           (activeElement as HTMLElement)?.contentEditable === 'true';
       
       if (!isInputElement && terminalInputRef.current) {
         terminalInputRef.current.focus();

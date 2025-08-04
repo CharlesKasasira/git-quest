@@ -1,4 +1,3 @@
-import React from 'react';
 import { useGame } from '../contexts/GameContext';
 
 function GameHeader() {

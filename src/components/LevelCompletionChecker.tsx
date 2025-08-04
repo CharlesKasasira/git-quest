@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useTerminal } from '../contexts/TerminalContext';
 import { LevelManager } from '../utils/levelManager';
