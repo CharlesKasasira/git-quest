@@ -32,15 +32,17 @@
     }
   },
   "include": [
-    "src",
-    "vite.config.ts",
-    "vitest.config.ts"
+    "src"
   ],
   "exclude": [
     "node_modules",
-    "dist"
-  ],
-  "references": [
-    { "path": "./tsconfig.node.json" }
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "vitest.config.ts",
+    "src/test/**/*",
+    "src/**/__tests__/**/*"
   ]
 } 
