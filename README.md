@@ -13,6 +13,14 @@ An interactive educational game that teaches Git concepts through a sci-fi termi
 - **Hint System** for learning Git concepts
 - **Retro/Pixel Art UI** with terminal aesthetics
 
+### 🎨 Visual Learning Features
+- **Interactive Commit Graph** - Visual representation of commits, branches, and merges
+- **File State Visualizer** - Show working directory, staging area, and repository states
+- **Branch Tree Diagram** - Real-time visualization of branch relationships
+- **Diff Viewer** - Side-by-side comparison of file changes
+- **Repository Explorer** - File tree with Git status indicators
+- **Version Control Introduction** - Educational content explaining Git concepts
+
 ### 🎯 Enhanced User Experience
 - **Keyboard Navigation**: Press any key to focus the terminal
 - **Command History**: Use ↑/↓ arrows to navigate command history
@@ -68,6 +76,12 @@ npm run type-check   # TypeScript type checking
 - **Enter**: Execute command
 - **↑/↓ Arrows**: Navigate command history
 - **Tab**: Auto-complete commands
+
+### Visual Learning
+- **Show Visual Button**: Click the "Show Visual" button in the bottom-right corner
+- **Visual Modes**: Switch between different visualizations (Commit Graph, File States, etc.)
+- **Interactive Elements**: Click on commits, branches, and files for detailed information
+- **Fullscreen Mode**: Use the maximize button for immersive learning experience
 
 ### Git Commands Supported
 The terminal recognizes 30+ Git commands including:

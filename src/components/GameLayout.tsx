@@ -1,13 +1,16 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import TimelinePanel from './TimelinePanel';
 import TerminalPanel from './TerminalPanel';
 import GameHeader from './GameHeader';
 import LevelCompletionChecker from './LevelCompletionChecker';
+import VisualPanel from './visual/VisualPanel';
 import { useGame } from '../contexts/GameContext';
+import { Eye, Terminal, X } from 'lucide-react';
 
 const GameLayout = memo(function GameLayout() {
   const { gameState } = useGame();
   const terminalInputRef = useRef<HTMLInputElement>(null);
+  const [showVisualPanel, setShowVisualPanel] = useState(false);
 
   // Keyboard navigation to focus terminal
   useEffect(() => {
@@ -43,6 +46,19 @@ const GameLayout = memo(function GameLayout() {
         </div>
       </div>
       
+      {/* Visual Learning Panel Toggle */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <button
+          onClick={() => setShowVisualPanel(!showVisualPanel)}
+          className="flex items-center space-x-2 px-4 py-2 bg-terminal-primary text-black rounded border border-terminal-primary hover:bg-terminal-primary hover:bg-opacity-80 transition-all"
+        >
+          <Eye className="w-4 h-4" />
+          <span className="text-sm font-mono">
+            {showVisualPanel ? 'Hide Visual' : 'Show Visual'}
+          </span>
+        </button>
+      </div>
+      
       {/* Floating Elements */}
       <div className="fixed top-4 right-4 z-50">
         <div className="bg-black border border-terminal-primary rounded px-3 py-1">
@@ -51,6 +67,24 @@ const GameLayout = memo(function GameLayout() {
           </span>
         </div>
       </div>
+
+      {/* Visual Learning Panel */}
+      {showVisualPanel && (
+        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-7xl h-full max-h-[90vh] bg-terminal-bg border-2 border-terminal-primary rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b-2 border-terminal-primary bg-terminal-bg">
+              <h2 className="text-xl font-pixel text-terminal-primary">Visual Learning Center</h2>
+              <button
+                onClick={() => setShowVisualPanel(false)}
+                className="p-2 text-terminal-secondary hover:text-terminal-primary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <VisualPanel className="h-full" />
+          </div>
+        </div>
+      )}
 
       {/* Level Completion Checker */}
       <LevelCompletionChecker />
