@@ -9,6 +9,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
   },
+  optimizeDeps: {
+    exclude: ['socket.io-client', 'uuid'],
+  },
   build: {
     sourcemap: true,
     rollupOptions: {
@@ -17,6 +20,13 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
           ui: ['lucide-react'],
         },
+      },
+      external: (id) => {
+        // Don't externalize these, but allow them to be optional
+        if (id === 'socket.io-client' || id === 'uuid') {
+          return false;
+        }
+        return false;
       },
     },
   },

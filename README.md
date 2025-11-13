@@ -21,6 +21,14 @@ An interactive educational game that teaches Git concepts through a sci-fi termi
 - **Repository Explorer** - File tree with Git status indicators
 - **Version Control Introduction** - Educational content explaining Git concepts
 
+### 🎮 Multiplayer Features
+- **Real-Time Challenges** - Compete with other players in Git challenges
+- **Live Collaboration** - Work together on shared Git repositories
+- **Global Chat** - Communicate with other learners worldwide
+- **User Presence** - See who's online and what they're working on
+- **Leaderboards** - Track your progress against other players
+- **Mentoring System** - Help beginners or get help from experts
+
 ### 🎯 Enhanced User Experience
 - **Keyboard Navigation**: Press any key to focus the terminal
 - **Command History**: Use ↑/↓ arrows to navigate command history
@@ -52,8 +60,14 @@ cd git-quest
 # Install dependencies
 npm install
 
-# Start development server
+# Start development server (frontend only)
 npm run dev
+
+# Start multiplayer server
+npm run server
+
+# Start both frontend and multiplayer server
+npm run dev:full
 ```
 
 ### Available Scripts
@@ -67,6 +81,8 @@ npm run test         # Run tests
 npm run test:ui      # Run tests with UI
 npm run test:coverage # Run tests with coverage
 npm run type-check   # TypeScript type checking
+npm run server       # Start multiplayer server
+npm run dev:full     # Start both frontend and server
 ```
 
 ## 🎮 How to Play
@@ -82,6 +98,14 @@ npm run type-check   # TypeScript type checking
 - **Visual Modes**: Switch between different visualizations (Commit Graph, File States, etc.)
 - **Interactive Elements**: Click on commits, branches, and files for detailed information
 - **Fullscreen Mode**: Use the maximize button for immersive learning experience
+
+### Multiplayer Features
+- **Show Multiplayer Button**: Click the "Show Multiplayer" button in the bottom-right corner
+- **Connect**: Enter your username to connect to the multiplayer server
+- **Challenge Players**: Click on online users to challenge them
+- **Live Collaboration**: Start shared Git sessions with other players
+- **Global Chat**: Communicate with all online players
+- **Leaderboards**: View rankings and compete for top spots
 
 ### Git Commands Supported
 The terminal recognizes 30+ Git commands including:

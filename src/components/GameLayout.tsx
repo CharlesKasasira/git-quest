@@ -4,13 +4,17 @@ import TerminalPanel from './TerminalPanel';
 import GameHeader from './GameHeader';
 import LevelCompletionChecker from './LevelCompletionChecker';
 import VisualPanel from './visual/VisualPanel';
+import MultiplayerPanel from './multiplayer/MultiplayerPanel';
 import { useGame } from '../contexts/GameContext';
-import { Eye, Terminal, X } from 'lucide-react';
+import { useMultiplayer } from '../contexts/MultiplayerContext';
+import { Eye, Terminal, X, Users, Wifi, WifiOff } from 'lucide-react';
 
 const GameLayout = memo(function GameLayout() {
   const { gameState } = useGame();
+  const { multiplayerState, updateUserPresence } = useMultiplayer();
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const [showVisualPanel, setShowVisualPanel] = useState(false);
+  const [showMultiplayerPanel, setShowMultiplayerPanel] = useState(false);
 
   // Keyboard navigation to focus terminal
   useEffect(() => {
@@ -46,8 +50,9 @@ const GameLayout = memo(function GameLayout() {
         </div>
       </div>
       
-      {/* Visual Learning Panel Toggle */}
-      <div className="fixed bottom-4 right-4 z-50">
+      {/* Control Buttons */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col space-y-2">
+        {/* Visual Learning Panel Toggle */}
         <button
           onClick={() => setShowVisualPanel(!showVisualPanel)}
           className="flex items-center space-x-2 px-4 py-2 bg-terminal-primary text-black rounded border border-terminal-primary hover:bg-terminal-primary hover:bg-opacity-80 transition-all"
@@ -55,6 +60,21 @@ const GameLayout = memo(function GameLayout() {
           <Eye className="w-4 h-4" />
           <span className="text-sm font-mono">
             {showVisualPanel ? 'Hide Visual' : 'Show Visual'}
+          </span>
+        </button>
+        
+        {/* Multiplayer Panel Toggle */}
+        <button
+          onClick={() => setShowMultiplayerPanel(!showMultiplayerPanel)}
+          className="flex items-center space-x-2 px-4 py-2 bg-terminal-secondary text-black rounded border border-terminal-secondary hover:bg-terminal-secondary hover:bg-opacity-80 transition-all"
+        >
+          {multiplayerState.isConnected ? (
+            <Wifi className="w-4 h-4" />
+          ) : (
+            <WifiOff className="w-4 h-4" />
+          )}
+          <span className="text-sm font-mono">
+            {showMultiplayerPanel ? 'Hide Multiplayer' : 'Show Multiplayer'}
           </span>
         </button>
       </div>
@@ -84,6 +104,14 @@ const GameLayout = memo(function GameLayout() {
             <VisualPanel className="h-full" />
           </div>
         </div>
+      )}
+
+      {/* Multiplayer Panel */}
+      {showMultiplayerPanel && (
+        <MultiplayerPanel
+          isOpen={showMultiplayerPanel}
+          onClose={() => setShowMultiplayerPanel(false)}
+        />
       )}
 
       {/* Level Completion Checker */}
