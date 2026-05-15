@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo, forwardRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from 'react';
 import { useTerminal } from '../contexts/TerminalContext';
 import { useGame } from '../contexts/GameContext';
+import { createPrompt, formatDirectoryForPrompt, getTerminalCompletions } from '../utils/bashTerminal';
 import { Terminal, HelpCircle, Lightbulb } from 'lucide-react';
 
 interface TerminalPanelProps {}
@@ -11,8 +12,9 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
     const [showHint, setShowHint] = useState<boolean>(false);
     const [commandHistory, setCommandHistory] = useState<string[]>([]);
     const [historyIndex, setHistoryIndex] = useState<number>(-1);
-    const { terminalState, executeCommand } = useTerminal();
-    const { currentLevel } = useGame();
+    const [completionOptions, setCompletionOptions] = useState<string[]>([]);
+    const { terminalState, executeCommand, clearHistory } = useTerminal();
+    const { gameState, currentLevel, recordHintUsed } = useGame();
     const inputRef = useRef<HTMLInputElement>(null);
     const historyRef = useRef<HTMLDivElement>(null);
 
@@ -43,12 +45,14 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
         await executeCommand(currentCommand.trim());
         setCurrentCommand('');
         setShowHint(false);
+        setCompletionOptions([]);
       }
     }, [currentCommand, terminalState.isProcessing, executeCommand]);
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
       setCurrentCommand(e.target.value);
       setShowHint(false);
+      setCompletionOptions([]);
     }, []);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -79,35 +83,59 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
         }
       } else if (e.key === 'Tab') {
         e.preventDefault();
-        // Simple tab completion for common Git commands
-        const commonCommands = ['git', 'init', 'add', 'commit', 'status', 'log', 'branch', 'checkout', 'merge'];
-        const current = currentCommand.toLowerCase();
-        
-        for (const cmd of commonCommands) {
-          if (cmd.startsWith(current) && cmd !== current) {
-            setCurrentCommand(cmd);
-            break;
-          }
+        const completions = getTerminalCompletions(currentCommand, terminalState);
+        if (completions.length === 1) {
+          const tokens = currentCommand.split(/\s+/);
+          tokens[tokens.length - 1] = completions[0] ?? '';
+          setCurrentCommand(tokens.join(' '));
+          setCompletionOptions([]);
+        } else if (completions.length > 1) {
+          setCompletionOptions(completions.slice(0, 12));
         }
+      } else if (e.key.toLowerCase() === 'l' && e.ctrlKey) {
+        e.preventDefault();
+        clearHistory();
+      } else if (e.key.toLowerCase() === 'c' && e.ctrlKey) {
+        e.preventDefault();
+        setCurrentCommand('');
+        setCompletionOptions([]);
       }
-    }, [commandHistory, historyIndex, currentCommand]);
+    }, [commandHistory, historyIndex, currentCommand, terminalState, clearHistory]);
 
     const getCurrentHint = useMemo(() => {
       if (!currentLevel || !currentCommand.trim()) return null;
       
-      const command = currentCommand.trim().split(' ')[0];
-      if (!command) return null;
-      
-      return currentLevel.hints[command] || null;
+      const [firstToken = '', secondToken = ''] = currentCommand.trim().toLowerCase().split(/\s+/);
+      if (!firstToken) return null;
+
+      if (firstToken === 'git' && secondToken) {
+        return currentLevel.hints[`git ${secondToken}`] || currentLevel.hints['git'] || null;
+      }
+
+      return currentLevel.hints[firstToken] || null;
     }, [currentLevel, currentCommand]);
 
     const toggleHint = useCallback(() => {
-      setShowHint(!showHint);
-    }, [showHint]);
+      const shouldOpen = !showHint;
+      setShowHint(shouldOpen);
+      if (shouldOpen && getCurrentHint && currentLevel) {
+        recordHintUsed(currentLevel.id);
+      }
+    }, [showHint, getCurrentHint, currentLevel, recordHintUsed]);
 
     const formatTimestamp = useCallback((date: Date): string => {
       return date.toLocaleTimeString();
     }, []);
+
+    const commandAccuracy = useMemo(() => {
+      if (gameState.totalCommandsExecuted === 0) {
+        return 100;
+      }
+      return Math.round((gameState.successfulCommandsExecuted / gameState.totalCommandsExecuted) * 100);
+    }, [gameState.totalCommandsExecuted, gameState.successfulCommandsExecuted]);
+
+    const prompt = useMemo(() => createPrompt(terminalState), [terminalState]);
+    const displayDirectory = useMemo(() => formatDirectoryForPrompt(terminalState), [terminalState]);
 
     return (
       <div className="h-full flex flex-col bg-black">
@@ -116,10 +144,19 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
           <div className="flex items-center space-x-3">
             <Terminal className="w-6 h-6 text-terminal-primary" />
             <span className="font-mono text-terminal-primary">
-              timeline-project:~$ 
+              {prompt}
             </span>
             <span className="text-terminal-secondary text-sm">
               {terminalState.currentRepo.initialized ? 'Git Repository' : 'No Repository'}
+            </span>
+            <span className="text-terminal-secondary text-xs font-mono">
+              bash • {displayDirectory}
+            </span>
+            <span className="text-terminal-warning text-xs font-mono">
+              Streak x{gameState.commandStreak}
+            </span>
+            <span className="text-terminal-secondary text-xs font-mono">
+              Accuracy {commandAccuracy}%
             </span>
           </div>
           
@@ -163,11 +200,11 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
         >
           {terminalState.history.length === 0 && (
             <div className="text-terminal-secondary mb-4">
-              <div className="mb-2">Welcome to Git Quest Terminal Simulator!</div>
-              <div className="mb-2">Type Git commands to progress through the timeline.</div>
-              <div className="text-terminal-warning">💡 Start with basic commands like 'git --help' or follow the mission objectives.</div>
+              <div className="mb-2">Welcome to Git Quest Bash.</div>
+              <div className="mb-2">Use shell commands, Git commands, pipes, variables, aliases, and redirection inside the training workspace.</div>
+              <div className="text-terminal-warning">Start with `git --help`, `ls -la`, `pwd`, or the mission objectives.</div>
               <div className="text-terminal-secondary mt-2 text-xs">
-                💡 Tip: Press any key to focus the terminal. Use ↑/↓ arrows to navigate command history.
+                Tip: ↑/↓ history • Tab completion • Ctrl+L clear • Ctrl+C cancel line • `help` for shell features.
               </div>
             </div>
           )}
@@ -176,10 +213,11 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
             <div key={index} className="mb-4">
               {/* Command Input */}
               <div className="flex items-center space-x-2">
-                <span className="text-terminal-primary">$</span>
+                <span className="text-terminal-primary">{cmd.prompt || '$'}</span>
                 <span className="text-terminal-text">{cmd.command}</span>
                 <span className="text-xs text-terminal-secondary ml-auto">
                   {formatTimestamp(cmd.timestamp)}
+                  {typeof cmd.exitCode === 'number' && ` • exit ${cmd.exitCode}`}
                 </span>
               </div>
               
@@ -191,6 +229,28 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
                   }`}
                 >
                   {cmd.output}
+                </div>
+              )}
+
+              {cmd.feedback && (
+                <div className="mt-2 ml-4 border-l-2 border-terminal-warning pl-3 text-terminal-warning whitespace-pre-wrap">
+                  {cmd.feedback}
+                </div>
+              )}
+
+              {cmd.visualChanges && cmd.visualChanges.length > 0 && (
+                <div className="mt-2 ml-4 border-l-2 border-terminal-secondary pl-3">
+                  <div className="text-terminal-secondary text-xs uppercase tracking-wide mb-1">
+                    Visual sync
+                  </div>
+                  <div className="space-y-1">
+                    {cmd.visualChanges.map((change, changeIndex) => (
+                      <div key={`${cmd.command}-visual-${changeIndex}`} className="text-xs">
+                        <span className="text-terminal-primary">{change.label}: </span>
+                        <span className="text-terminal-text">{change.detail}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -208,7 +268,7 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
         {/* Command Input */}
         <div className="p-4 border-t-2 border-terminal-primary bg-terminal-bg">
           <form onSubmit={handleSubmit} className="flex items-center space-x-3">
-            <span className="text-terminal-primary font-mono">$</span>
+            <span className="text-terminal-primary font-mono whitespace-nowrap">{prompt}</span>
             <input
               ref={effectiveRef}
               type="text"
@@ -234,12 +294,20 @@ const TerminalPanel = forwardRef<HTMLInputElement, TerminalPanelProps>(
                 }
               `}
             >
-              Execute
+              Run
             </button>
           </form>
+
+          {completionOptions.length > 0 && (
+            <div className="mt-2 ml-4 flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono text-terminal-secondary">
+              {completionOptions.map((option) => (
+                <span key={option}>{option}</span>
+              ))}
+            </div>
+          )}
           
           <div className="mt-2 text-xs text-terminal-secondary">
-            Press Enter to execute commands • Type "git --help" for available commands • Use ↑/↓ for history
+            {'Enter runs commands • Supports `&&`, `||`, `;`, pipes, `>`, `>>`, `$VARS`, aliases, and Git commands'}
           </div>
         </div>
       </div>

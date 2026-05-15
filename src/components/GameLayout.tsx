@@ -5,13 +5,14 @@ import GameHeader from './GameHeader';
 import LevelCompletionChecker from './LevelCompletionChecker';
 import VisualPanel from './visual/VisualPanel';
 import MultiplayerPanel from './multiplayer/MultiplayerPanel';
+import AchievementToast from './AchievementToast';
 import { useGame } from '../contexts/GameContext';
 import { useMultiplayer } from '../contexts/MultiplayerContext';
-import { Eye, Terminal, X, Users, Wifi, WifiOff } from 'lucide-react';
+import { Eye, X, Wifi, WifiOff } from 'lucide-react';
 
 const GameLayout = memo(function GameLayout() {
   const { gameState } = useGame();
-  const { multiplayerState, updateUserPresence } = useMultiplayer();
+  const { multiplayerState } = useMultiplayer();
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const [showVisualPanel, setShowVisualPanel] = useState(false);
   const [showMultiplayerPanel, setShowMultiplayerPanel] = useState(false);
@@ -116,6 +117,7 @@ const GameLayout = memo(function GameLayout() {
 
       {/* Level Completion Checker */}
       <LevelCompletionChecker />
+      <AchievementToast />
     </div>
   );
 });

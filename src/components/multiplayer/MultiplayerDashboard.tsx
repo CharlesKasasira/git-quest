@@ -1,6 +1,6 @@
 import React, { memo, useState, useCallback, useMemo } from 'react';
 import { useMultiplayer } from '../../contexts/MultiplayerContext';
-import { User, Challenge, LiveCollaboration } from '../../types/multiplayer';
+import { User } from '../../types/multiplayer';
 import { 
   Users, 
   Trophy, 
@@ -14,46 +14,80 @@ import {
   Star,
   Target,
   Users2,
-  Zap
+  Zap,
+  DoorOpen,
+  Eye,
+  LogOut,
+  GitBranch,
+  ClipboardCheck
 } from 'lucide-react';
 
 interface MultiplayerDashboardProps {
   className?: string;
+  onUserSelect?: (user: User) => void;
+  onDisconnect?: () => void;
 }
 
 const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function MultiplayerDashboard({
-  className = ''
+  className = '',
+  onUserSelect,
+  onDisconnect
 }) {
   const { 
     multiplayerState, 
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    spectateRoom,
+    stopSpectating,
     createChallenge, 
     createCollaboration,
     sendMessage,
+    getRooms,
     getOnlineUsers,
     getActiveChallenges,
+    getChallengeResults,
     getNotifications
   } = useMultiplayer();
   
-  const [activeTab, setActiveTab] = useState<'users' | 'challenges' | 'collaborations' | 'chat' | 'leaderboard'>('users');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'users' | 'challenges' | 'collaborations' | 'chat' | 'leaderboard' | 'results'>('rooms');
   const [chatMessage, setChatMessage] = useState('');
+  const [roomName, setRoomName] = useState('');
 
+  const rooms = useMemo(() => getRooms(), [getRooms]);
   const onlineUsers = useMemo(() => getOnlineUsers(), [getOnlineUsers]);
   const activeChallenges = useMemo(() => getActiveChallenges(), [getActiveChallenges]);
+  const challengeResults = useMemo(() => getChallengeResults(), [getChallengeResults]);
   const notifications = useMemo(() => getNotifications(), [getNotifications]);
+  const currentRoom = useMemo(
+    () => rooms.find(room => room.id === multiplayerState.currentRoomId),
+    [rooms, multiplayerState.currentRoomId]
+  );
+  const spectatingRoom = useMemo(
+    () => rooms.find(room => room.id === multiplayerState.spectatingRoomId),
+    [rooms, multiplayerState.spectatingRoomId]
+  );
 
   const handleUserSelect = useCallback((user: User) => {
-    setSelectedUser(user);
-  }, []);
+    onUserSelect?.(user);
+  }, [onUserSelect]);
 
   const handleCreateChallenge = useCallback((user: User, type: string, difficulty: string) => {
-    createChallenge(user, type, difficulty);
-    setSelectedUser(null);
-  }, [createChallenge]);
+    createChallenge(user, type, difficulty, multiplayerState.currentRoomId);
+  }, [createChallenge, multiplayerState.currentRoomId]);
 
   const handleCreateCollaboration = useCallback((users: User[]) => {
-    createCollaboration(users);
-  }, [createCollaboration]);
+    createCollaboration(users, multiplayerState.currentRoomId);
+  }, [createCollaboration, multiplayerState.currentRoomId]);
+
+  const handleCreateRoom = useCallback((event: React.FormEvent) => {
+    event.preventDefault();
+    const fallbackName = multiplayerState.currentUser
+      ? `${multiplayerState.currentUser.username}'s room`
+      : 'Git room';
+    createRoom(roomName.trim() || fallbackName);
+    setRoomName('');
+  }, [createRoom, multiplayerState.currentUser, roomName]);
 
   const handleSendMessage = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -95,10 +129,25 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
         </div>
         
         <div className="flex items-center space-x-2">
+          {(currentRoom || spectatingRoom) && (
+            <div className="hidden md:flex items-center space-x-1 text-sm text-terminal-secondary">
+              {spectatingRoom ? <Eye className="w-4 h-4" /> : <DoorOpen className="w-4 h-4" />}
+              <span>{spectatingRoom?.name || currentRoom?.name}</span>
+            </div>
+          )}
           <div className="flex items-center space-x-1 text-sm text-terminal-secondary">
             <div className="w-2 h-2 bg-terminal-primary rounded-full animate-pulse"></div>
             <span>{onlineUsers.length} online</span>
           </div>
+          {onDisconnect && (
+            <button
+              onClick={onDisconnect}
+              className="p-2 text-terminal-secondary hover:text-terminal-error transition-colors"
+              title="Disconnect"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          )}
           <button className="p-2 text-terminal-secondary hover:text-terminal-primary transition-colors">
             <Settings className="w-5 h-5" />
           </button>
@@ -108,11 +157,13 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
       {/* Tab Navigation */}
       <div className="flex border-b border-terminal-primary bg-terminal-bg">
         {[
+          { id: 'rooms', label: 'Rooms', icon: DoorOpen },
           { id: 'users', label: 'Online Users', icon: Users },
           { id: 'challenges', label: 'Challenges', icon: Target },
           { id: 'collaborations', label: 'Collaborations', icon: Users2 },
           { id: 'chat', label: 'Chat', icon: MessageSquare },
           { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+          { id: 'results', label: 'Results', icon: ClipboardCheck },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -131,6 +182,114 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
 
       {/* Content */}
       <div className="flex-1 p-4 overflow-y-auto max-h-96">
+        {activeTab === 'rooms' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-mono text-terminal-primary">Rooms</h3>
+              <span className="text-sm text-terminal-secondary">{rooms.length} open</span>
+            </div>
+
+            <form onSubmit={handleCreateRoom} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={roomName}
+                onChange={(event) => setRoomName(event.target.value)}
+                placeholder="Room name"
+                className="flex-1 px-3 py-2 bg-transparent border border-terminal-secondary rounded text-terminal-text placeholder-terminal-secondary focus:border-terminal-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="flex items-center space-x-2 px-3 py-2 bg-terminal-primary text-black rounded border border-terminal-primary hover:bg-terminal-primary hover:bg-opacity-80 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-sm font-mono">Create</span>
+              </button>
+            </form>
+
+            {rooms.length === 0 ? (
+              <div className="text-center text-terminal-secondary py-8">
+                <DoorOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No rooms yet</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {rooms.map((room) => {
+                  const isParticipant = room.id === multiplayerState.currentRoomId;
+                  const isSpectator = room.id === multiplayerState.spectatingRoomId;
+
+                  return (
+                    <div
+                      key={room.id}
+                      className={`p-4 border rounded transition-all ${
+                        isParticipant || isSpectator
+                          ? 'border-terminal-primary bg-terminal-primary bg-opacity-5'
+                          : 'border-terminal-secondary hover:border-terminal-primary'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <DoorOpen className="w-4 h-4 text-terminal-primary" />
+                            <span className="text-terminal-primary font-mono">{room.name}</span>
+                          </div>
+                          <div className="text-xs text-terminal-secondary mt-1">
+                            {room.status} • {room.participants.length} players • {room.spectators.length} spectators
+                          </div>
+                        </div>
+                        {(isParticipant || isSpectator) && (
+                          <span className="text-xs px-2 py-1 rounded bg-terminal-primary text-black">
+                            {isSpectator ? 'spectating' : 'joined'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-terminal-secondary mb-3">
+                        <div className="flex items-center space-x-1">
+                          <Target className="w-3 h-3" />
+                          <span>{room.activeChallengeIds.length} challenges</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <GitBranch className="w-3 h-3" />
+                          <span>{room.sharedRepository.commits.length} commits</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {isParticipant || isSpectator ? (
+                          <button
+                            onClick={() => isSpectator ? stopSpectating(room.id) : leaveRoom(room.id)}
+                            className="flex items-center space-x-1 px-3 py-1 border border-terminal-secondary text-terminal-secondary rounded hover:text-terminal-primary hover:border-terminal-primary transition-all"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span className="text-sm font-mono">Leave</span>
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => joinRoom(room.id)}
+                              className="flex items-center space-x-1 px-3 py-1 bg-terminal-primary text-black rounded border border-terminal-primary hover:bg-terminal-primary hover:bg-opacity-80 transition-all"
+                            >
+                              <Users2 className="w-4 h-4" />
+                              <span className="text-sm font-mono">Join</span>
+                            </button>
+                            <button
+                              onClick={() => spectateRoom(room.id)}
+                              className="flex items-center space-x-1 px-3 py-1 border border-terminal-secondary text-terminal-secondary rounded hover:text-terminal-primary hover:border-terminal-primary transition-all"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span className="text-sm font-mono">Spectate</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'users' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between mb-4">
@@ -225,6 +384,8 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
                         <span className="text-terminal-primary font-mono">{challenge.type}</span>
                         <span className="text-terminal-secondary text-sm">•</span>
                         <span className="text-terminal-secondary text-sm">{challenge.difficulty}</span>
+                        <span className="text-terminal-secondary text-sm">•</span>
+                        <span className="text-terminal-secondary text-sm">{challenge.visibility || 'private'}</span>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded ${
                         challenge.status === 'active' ? 'bg-terminal-primary text-black' :
@@ -412,6 +573,52 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
             )}
           </div>
         )}
+
+        {activeTab === 'results' && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-mono text-terminal-primary">Challenge Results</h3>
+              <span className="text-sm text-terminal-secondary">{challengeResults.length} completed</span>
+            </div>
+
+            {challengeResults.length === 0 ? (
+              <div className="text-center text-terminal-secondary py-8">
+                <ClipboardCheck className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No completed challenges</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {challengeResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="p-4 border border-terminal-secondary rounded hover:border-terminal-primary transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <ClipboardCheck className="w-4 h-4 text-terminal-primary" />
+                        <span className="text-terminal-primary font-mono">
+                          {result.winner ? `${result.winner.username} won` : 'Draw'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-terminal-secondary">
+                        {result.completedAt.toLocaleTimeString()}
+                      </span>
+                    </div>
+
+                    <div className="text-sm text-terminal-text mb-2">{result.summary}</div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-terminal-secondary">
+                      <div>{result.challenger.username}: {result.score.challenger}</div>
+                      <div>{result.challenged.username}: {result.score.challenged}</div>
+                      <div>{result.score.commandsExecuted} commands</div>
+                      <div>{result.score.errors} errors</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notifications */}
@@ -435,4 +642,3 @@ const MultiplayerDashboard: React.FC<MultiplayerDashboardProps> = memo(function 
 });
 
 export default MultiplayerDashboard;
-

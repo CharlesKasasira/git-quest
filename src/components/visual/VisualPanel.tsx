@@ -40,6 +40,29 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
   const [activeMode, setActiveMode] = useState<VisualMode>('intro');
   const [selectedFile, setSelectedFile] = useState<GitFile | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const latestCommand = terminalState.history[terminalState.history.length - 1];
+  const latestVisualChanges = latestCommand?.visualChanges ?? [];
+  const highlightedFiles = useMemo(
+    () =>
+      latestVisualChanges
+        .filter((change) => change.area === 'files' || change.area === 'staging')
+        .flatMap((change) => change.names ?? []),
+    [latestVisualChanges]
+  );
+  const highlightedBranches = useMemo(
+    () =>
+      latestVisualChanges
+        .filter((change) => change.area === 'branches')
+        .flatMap((change) => change.names ?? []),
+    [latestVisualChanges]
+  );
+  const highlightedCommits = useMemo(
+    () =>
+      latestVisualChanges
+        .filter((change) => change.area === 'commits')
+        .flatMap((change) => change.names ?? []),
+    [latestVisualChanges]
+  );
 
   const visualModes = [
     { id: 'intro', label: 'Introduction', icon: BookOpen, description: 'Learn version control basics' },
@@ -77,6 +100,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
             commits={terminalState.currentRepo.commits}
             branches={terminalState.currentRepo.branches}
             currentBranch={terminalState.currentRepo.currentBranch}
+            selectedCommit={highlightedCommits[highlightedCommits.length - 1]}
             onCommitSelect={(commit) => console.log('Selected commit:', commit)}
           />
         );
@@ -85,6 +109,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
         return (
           <FileStateVisualizer
             repository={terminalState.currentRepo}
+            highlightedFiles={highlightedFiles}
             onFileSelect={handleFileSelect}
           />
         );
@@ -94,6 +119,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
           <BranchTree
             branches={terminalState.currentRepo.branches}
             currentBranch={terminalState.currentRepo.currentBranch}
+            highlightedBranches={highlightedBranches}
             onBranchSelect={(branch) => console.log('Selected branch:', branch)}
           />
         );
@@ -111,6 +137,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
         return (
           <RepositoryExplorer
             repository={terminalState.currentRepo}
+            highlightedFiles={highlightedFiles}
             onFileSelect={handleFileSelect}
           />
         );
@@ -123,10 +150,12 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
                 commits={terminalState.currentRepo.commits}
                 branches={terminalState.currentRepo.branches}
                 currentBranch={terminalState.currentRepo.currentBranch}
+                selectedCommit={highlightedCommits[highlightedCommits.length - 1]}
                 onCommitSelect={(commit) => console.log('Selected commit:', commit)}
               />
               <FileStateVisualizer
                 repository={terminalState.currentRepo}
+                highlightedFiles={highlightedFiles}
                 onFileSelect={handleFileSelect}
               />
             </div>
@@ -134,6 +163,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
               <BranchTree
                 branches={terminalState.currentRepo.branches}
                 currentBranch={terminalState.currentRepo.currentBranch}
+                highlightedBranches={highlightedBranches}
                 onBranchSelect={(branch) => console.log('Selected branch:', branch)}
               />
               <DiffViewer
@@ -148,7 +178,7 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
       default:
         return null;
     }
-  }, [activeMode, terminalState.currentRepo, selectedFile, handleFileSelect]);
+  }, [activeMode, terminalState.currentRepo, selectedFile, handleFileSelect, highlightedFiles, highlightedBranches, highlightedCommits]);
 
   const currentMode = visualModes.find(mode => mode.id === activeMode);
 
@@ -199,6 +229,27 @@ const VisualPanel: React.FC<VisualPanelProps> = memo(function VisualPanel({
 
       {/* Content */}
       <div className={`p-6 ${isFullscreen ? 'h-full overflow-y-auto' : 'max-h-96 overflow-y-auto'}`}>
+        {latestVisualChanges.length > 0 && (
+          <div className="mb-4 border border-terminal-secondary bg-black rounded p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-terminal-primary font-mono">Last Command Visual Sync</h3>
+              <span className="text-terminal-secondary text-xs font-mono">
+                {latestCommand?.command}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {latestVisualChanges.map((change, index) => (
+                <div key={`${change.area}-${index}`} className="border border-terminal-secondary border-opacity-40 rounded p-2">
+                  <div className="text-xs uppercase text-terminal-secondary mb-1">
+                    {change.area}
+                  </div>
+                  <div className="text-sm text-terminal-primary">{change.label}</div>
+                  <div className="text-xs text-terminal-text mt-1">{change.detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {renderVisualContent()}
       </div>
 

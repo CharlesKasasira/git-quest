@@ -15,6 +15,7 @@ import {
 
 interface RepositoryExplorerProps {
   repository: GitRepository;
+  highlightedFiles?: string[];
   onFileSelect?: (file: GitFile) => void;
   className?: string;
 }
@@ -30,6 +31,7 @@ interface FileTreeNode {
 
 const RepositoryExplorer: React.FC<RepositoryExplorerProps> = memo(function RepositoryExplorer({
   repository,
+  highlightedFiles = [],
   onFileSelect,
   className = ''
 }) {
@@ -161,6 +163,10 @@ const RepositoryExplorer: React.FC<RepositoryExplorerProps> = memo(function Repo
       <Folder className="w-4 h-4 text-terminal-secondary" />;
   }, []);
 
+  const isHighlighted = useCallback((file: GitFile): boolean => {
+    return highlightedFiles.includes(file.name);
+  }, [highlightedFiles]);
+
   const renderTreeNode = useCallback((node: FileTreeNode, depth = 0) => {
     const indent = depth * 20;
     
@@ -170,7 +176,7 @@ const RepositoryExplorer: React.FC<RepositoryExplorerProps> = memo(function Repo
           key={node.path}
           className={`flex items-center space-x-2 p-2 cursor-pointer hover:bg-terminal-secondary hover:bg-opacity-10 transition-colors ${
             selectedFile?.name === node.file.name ? 'bg-terminal-primary bg-opacity-20' : ''
-          }`}
+          } ${isHighlighted(node.file) ? 'ring-2 ring-terminal-primary bg-terminal-primary bg-opacity-10' : ''}`}
           style={{ paddingLeft: `${indent + 8}px` }}
           onClick={() => handleFileClick(node.file!)}
         >
@@ -208,7 +214,7 @@ const RepositoryExplorer: React.FC<RepositoryExplorerProps> = memo(function Repo
         )}
       </div>
     );
-  }, [selectedFile, handleFileClick, handleFolderToggle, getFileIcon, getFileStatus, getFileStatusColor, getFolderIcon]);
+  }, [selectedFile, handleFileClick, handleFolderToggle, getFileIcon, getFileStatus, getFileStatusColor, getFolderIcon, isHighlighted]);
 
   return (
     <div className={`repository-explorer ${className}`}>

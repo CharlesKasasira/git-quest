@@ -4,6 +4,7 @@ import { FileText, Plus, CheckCircle, AlertCircle, GitBranch } from 'lucide-reac
 
 interface FileStateVisualizerProps {
   repository: GitRepository;
+  highlightedFiles?: string[];
   onFileSelect?: (file: GitFile) => void;
   className?: string;
 }
@@ -16,6 +17,7 @@ interface FileState {
 
 const FileStateVisualizer: React.FC<FileStateVisualizerProps> = memo(function FileStateVisualizer({
   repository,
+  highlightedFiles = [],
   onFileSelect,
   className = ''
 }) {
@@ -58,6 +60,10 @@ const FileStateVisualizer: React.FC<FileStateVisualizerProps> = memo(function Fi
     return 'text-terminal-secondary';
   }, [repository.initialized]);
 
+  const isHighlighted = useCallback((file: GitFile): boolean => {
+    return highlightedFiles.includes(file.name);
+  }, [highlightedFiles]);
+
   return (
     <div className={`file-state-visualizer ${className}`}>
       <div className="mb-4">
@@ -87,7 +93,9 @@ const FileStateVisualizer: React.FC<FileStateVisualizerProps> = memo(function Fi
               fileStates.working.map((file, index) => (
                 <div
                   key={`working-${index}`}
-                  className="flex items-center space-x-2 p-2 bg-terminal-warning bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors"
+                  className={`flex items-center space-x-2 p-2 bg-terminal-warning bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors ${
+                    isHighlighted(file) ? 'ring-2 ring-terminal-warning' : ''
+                  }`}
                   onClick={() => handleFileClick(file)}
                 >
                   {getFileIcon(file)}
@@ -122,7 +130,9 @@ const FileStateVisualizer: React.FC<FileStateVisualizerProps> = memo(function Fi
               fileStates.staged.map((file, index) => (
                 <div
                   key={`staged-${index}`}
-                  className="flex items-center space-x-2 p-2 bg-terminal-primary bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors"
+                  className={`flex items-center space-x-2 p-2 bg-terminal-primary bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors ${
+                    isHighlighted(file) ? 'ring-2 ring-terminal-primary' : ''
+                  }`}
                   onClick={() => handleFileClick(file)}
                 >
                   {getFileIcon(file)}
@@ -157,7 +167,9 @@ const FileStateVisualizer: React.FC<FileStateVisualizerProps> = memo(function Fi
               fileStates.committed.map((file, index) => (
                 <div
                   key={`committed-${index}`}
-                  className="flex items-center space-x-2 p-2 bg-terminal-secondary bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors"
+                  className={`flex items-center space-x-2 p-2 bg-terminal-secondary bg-opacity-10 rounded cursor-pointer hover:bg-opacity-20 transition-colors ${
+                    isHighlighted(file) ? 'ring-2 ring-terminal-secondary' : ''
+                  }`}
                   onClick={() => handleFileClick(file)}
                 >
                   {getFileIcon(file)}

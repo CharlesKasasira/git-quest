@@ -46,6 +46,9 @@ export interface Challenge {
   type: 'speed' | 'accuracy' | 'collaboration' | 'mentoring';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   status: 'pending' | 'active' | 'completed' | 'cancelled';
+  visibility?: ChallengeVisibility;
+  roomId?: string;
+  spectators?: User[];
   timeLimit?: number;
   objectives: string[];
   createdAt: Date;
@@ -64,9 +67,46 @@ export interface ChallengeScore {
   errors: number;
 }
 
+export interface ChallengeResult {
+  id: string;
+  challengeId: string;
+  roomId?: string;
+  challenger: User;
+  challenged: User;
+  winner?: User;
+  score: ChallengeScore;
+  summary: string;
+  completedAt: Date;
+}
+
+export interface MultiplayerRoom {
+  id: string;
+  name: string;
+  ownerId: string;
+  participants: User[];
+  spectators: User[];
+  activeChallengeIds: string[];
+  collaborationIds: string[];
+  sharedRepository: GitRepository;
+  status: 'open' | 'active' | 'closed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SharedRepositoryUpdate {
+  roomId?: string;
+  collaborationId?: string;
+  repository: GitRepository;
+  updatedBy: string;
+  updatedAt: Date;
+  change?: LiveChange;
+}
+
 export interface LiveCollaboration {
   id: string;
+  roomId?: string;
   participants: User[];
+  spectators?: User[];
   sharedRepository: GitRepository;
   activeUser: string;
   cursorPosition: CursorPosition;
@@ -74,6 +114,7 @@ export interface LiveCollaboration {
   voiceChat: boolean;
   screenShare: boolean;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 export interface CursorPosition {
@@ -102,6 +143,11 @@ export interface GitRepository {
     userEmail?: string;
   };
   workingDirectory: string;
+  head?: GitHead;
+  stagingArea?: GitIndexEntry[];
+  remotes?: GitRemote[];
+  tags?: GitTag[];
+  conflicts?: GitConflict[];
 }
 
 export interface GitFile {
@@ -109,12 +155,16 @@ export interface GitFile {
   content: string;
   staged: boolean;
   modified: boolean;
+  tracked?: boolean;
+  status?: GitFileStatus;
+  conflict?: boolean;
 }
 
 export interface GitBranch {
   name: string;
   commits: GitCommit[];
   current: boolean;
+  head?: string;
 }
 
 export interface GitCommit {
@@ -123,6 +173,43 @@ export interface GitCommit {
   author: string;
   timestamp: Date;
   files: string[];
+  parents?: string[];
+  tree?: Record<string, string>;
+}
+
+export type GitFileStatus = 'untracked' | 'modified' | 'staged' | 'tracked' | 'conflicted';
+
+export interface GitHead {
+  type: 'branch' | 'detached';
+  target: string;
+}
+
+export interface GitIndexEntry {
+  fileName: string;
+  content: string;
+  status: 'added' | 'modified' | 'deleted';
+}
+
+export interface GitRemote {
+  name: string;
+  url: string;
+  branches: Record<string, string>;
+}
+
+export interface GitTag {
+  name: string;
+  target: string;
+  annotated: boolean;
+  message?: string;
+  createdAt: Date;
+}
+
+export interface GitConflict {
+  fileName: string;
+  ours: string;
+  theirs: string;
+  base?: string;
+  resolved: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -166,23 +253,45 @@ export interface Notification {
 
 export interface MultiplayerState {
   onlineUsers: User[];
+  rooms: MultiplayerRoom[];
   activeChallenges: Challenge[];
   liveCollaborations: LiveCollaboration[];
+  challengeResults: ChallengeResult[];
   globalLeaderboard: LeaderboardEntry[];
   userPresence: UserPresence[];
   chatMessages: ChatMessage[];
   notifications: Notification[];
   currentUser?: User;
+  currentRoomId?: string;
+  spectatingRoomId?: string;
   isConnected: boolean;
 }
 
 // Socket.IO event types
 export interface SocketEvents {
   // User events
-  'user:join': (user: User) => void;
-  'user:leave': (userId: string) => void;
+  'user:join': (userData: Partial<User> & { userId?: string }) => void;
+  'user:authenticated': (user: User) => void;
+  'user:list': (users: User[]) => void;
+  'user:joined': (user: User) => void;
+  'user:left': (userId: string) => void;
   'user:presence': (presence: UserPresence) => void;
   'user:update': (user: User) => void;
+
+  // Room events
+  'room:create': (room: MultiplayerRoom) => void;
+  'room:list': (rooms: MultiplayerRoom[]) => void;
+  'room:created': (room: MultiplayerRoom) => void;
+  'room:join': (roomId: string) => void;
+  'room:leave': (roomId: string) => void;
+  'room:spectate': (roomId: string) => void;
+  'room:stop-spectating': (roomId: string) => void;
+  'room:updated': (room: MultiplayerRoom) => void;
+  'room:closed': (roomId: string) => void;
+
+  // Shared repo events
+  'repo:update': (update: SharedRepositoryUpdate) => void;
+  'repo:updated': (update: SharedRepositoryUpdate) => void;
 
   // Challenge events
   'challenge:create': (challenge: Challenge) => void;
@@ -191,6 +300,8 @@ export interface SocketEvents {
   'challenge:start': (challengeId: string) => void;
   'challenge:complete': (challengeId: string, score: ChallengeScore) => void;
   'challenge:cancel': (challengeId: string) => void;
+  'challenge:cancelled': (challenge: Challenge) => void;
+  'challenge:result': (result: ChallengeResult) => void;
 
   // Collaboration events
   'collaboration:create': (collaboration: LiveCollaboration) => void;
@@ -220,6 +331,7 @@ export interface SocketEvents {
 export type ChallengeType = 'speed' | 'accuracy' | 'collaboration' | 'mentoring';
 export type ChallengeDifficulty = 'beginner' | 'intermediate' | 'advanced';
 export type ChallengeStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+export type ChallengeVisibility = 'private' | 'room' | 'public';
 
 // User status types
 export type UserStatus = 'online' | 'busy' | 'away' | 'in-challenge' | 'mentoring';
@@ -327,4 +439,3 @@ export const MULTIPLAYER_ACHIEVEMENTS = [
     rarity: 'rare'
   }
 ];
-

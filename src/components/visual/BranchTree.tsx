@@ -5,6 +5,7 @@ import { GitBranch as GitBranchIcon, GitMerge, GitCommit as GitCommitIcon } from
 interface BranchTreeProps {
   branches: GitBranch[];
   currentBranch: string;
+  highlightedBranches?: string[];
   onBranchSelect?: (branch: GitBranch) => void;
   className?: string;
 }
@@ -28,6 +29,7 @@ interface BranchConnection {
 const BranchTree: React.FC<BranchTreeProps> = memo(function BranchTree({
   branches,
   currentBranch,
+  highlightedBranches = [],
   onBranchSelect,
   className = ''
 }) {
@@ -129,8 +131,14 @@ const BranchTree: React.FC<BranchTreeProps> = memo(function BranchTree({
                 cy={node.y}
                 r="20"
                 fill={node.isCurrent ? '#00ff41' : '#00d4aa'}
-                stroke={hoveredBranch === node.branch.name ? '#ffffff' : '#333333'}
-                strokeWidth={hoveredBranch === node.branch.name ? '3' : '2'}
+                stroke={
+                  highlightedBranches.includes(node.branch.name)
+                    ? '#ffb86c'
+                    : hoveredBranch === node.branch.name
+                      ? '#ffffff'
+                      : '#333333'
+                }
+                strokeWidth={highlightedBranches.includes(node.branch.name) ? '4' : hoveredBranch === node.branch.name ? '3' : '2'}
                 className="cursor-pointer transition-all duration-200 hover:r-24"
                 onClick={() => handleBranchClick(node.branch)}
                 onMouseEnter={() => handleBranchHover(node.branch.name)}
@@ -213,7 +221,7 @@ const BranchTree: React.FC<BranchTreeProps> = memo(function BranchTree({
               branch.name === currentBranch
                 ? 'border-terminal-primary bg-terminal-primary bg-opacity-20'
                 : 'border-terminal-secondary bg-terminal-secondary bg-opacity-10 hover:bg-opacity-20'
-            }`}
+            } ${highlightedBranches.includes(branch.name) ? 'ring-2 ring-terminal-warning' : ''}`}
             onClick={() => handleBranchClick(branch)}
           >
             <div className="flex items-center space-x-3">

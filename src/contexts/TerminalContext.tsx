@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { TerminalState, TerminalCommand, GitRepository } from '../types/game';
+import { createDefaultEnvironment, createDefaultFileSystem, createPrompt, runBashScript } from '../utils/bashTerminal';
 import { GitSimulator } from '../utils/gitSimulator';
-import { LevelManager } from '../utils/levelManager';
 import { useGame } from './GameContext';
 
 interface TerminalContextType {
@@ -14,9 +14,12 @@ interface TerminalContextType {
 type TerminalAction =
   | { type: 'ADD_COMMAND'; payload: TerminalCommand }
   | { type: 'SET_REPO'; payload: GitRepository }
+  | { type: 'APPLY_EXECUTION'; payload: Omit<TerminalState, 'history' | 'isProcessing'> }
   | { type: 'SET_PROCESSING'; payload: boolean }
   | { type: 'CLEAR_HISTORY' }
   | { type: 'RESET'; payload: GitRepository };
+
+const initialEnvironment = createDefaultEnvironment();
 
 const initialTerminalState: TerminalState = {
   history: [],
@@ -29,7 +32,14 @@ const initialTerminalState: TerminalState = {
     config: {},
     workingDirectory: '/timeline-project',
   },
-  currentDirectory: '/timeline-project',
+  currentDirectory: initialEnvironment.HOME ?? '/timeline-project',
+  environment: initialEnvironment,
+  aliases: {
+    gs: 'git status',
+    gl: 'git log',
+  },
+  fileSystem: createDefaultFileSystem(),
+  lastExitCode: 0,
   isProcessing: false,
 };
 
@@ -45,6 +55,12 @@ function terminalReducer(state: TerminalState, action: TerminalAction): Terminal
       return {
         ...state,
         currentRepo: action.payload,
+      };
+
+    case 'APPLY_EXECUTION':
+      return {
+        ...state,
+        ...action.payload,
       };
 
     case 'SET_PROCESSING':
@@ -63,6 +79,20 @@ function terminalReducer(state: TerminalState, action: TerminalAction): Terminal
       return {
         ...initialTerminalState,
         currentRepo: action.payload,
+        currentDirectory: action.payload.workingDirectory,
+        environment: {
+          ...initialEnvironment,
+          HOME: action.payload.workingDirectory,
+          PWD: action.payload.workingDirectory,
+        },
+        fileSystem: createDefaultFileSystem().map((entry) =>
+          entry.path.startsWith('/timeline-project')
+            ? {
+                ...entry,
+                path: entry.path.replace('/timeline-project', action.payload.workingDirectory),
+              }
+            : entry
+        ),
       };
 
     default:
@@ -79,14 +109,15 @@ interface TerminalProviderProps {
 export function TerminalProvider({ children }: TerminalProviderProps) {
   const [terminalState, dispatch] = useReducer(terminalReducer, initialTerminalState);
   const gitSimulator = new GitSimulator();
-  const levelManager = new LevelManager();
+  const { currentLevel, recordCommandResult } = useGame();
 
   const executeCommand = async (commandInput: string): Promise<void> => {
     dispatch({ type: 'SET_PROCESSING', payload: true });
+    const startedAt = performance.now();
 
     try {
-      // Parse the command
-      const [command, ...args] = commandInput.trim().split(/\s+/);
+      const [, ...args] = commandInput.trim().split(/\s+/);
+      const prompt = createPrompt(terminalState);
       
       // Create command entry
       const terminalCommand: TerminalCommand = {
@@ -94,35 +125,50 @@ export function TerminalProvider({ children }: TerminalProviderProps) {
         args,
         output: '',
         success: false,
+        cwd: terminalState.currentDirectory,
+        prompt,
         timestamp: new Date(),
       };
 
-      // Add the command to history immediately
-      dispatch({ type: 'ADD_COMMAND', payload: terminalCommand });
+      await new Promise(resolve => setTimeout(resolve, 80));
 
-      // Simulate command execution delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Execute the command using GitSimulator
-      const result = gitSimulator.executeCommand(command, args, terminalState.currentRepo);
+      const result = runBashScript(commandInput, terminalState, gitSimulator);
 
       // Update the command with results
       const updatedCommand: TerminalCommand = {
         ...terminalCommand,
         output: result.output,
+        ...(result.feedback ? { feedback: result.feedback } : {}),
+        ...(result.visualChanges ? { visualChanges: result.visualChanges } : {}),
         success: result.success,
+        exitCode: result.exitCode,
+        durationMs: Math.round(performance.now() - startedAt),
       };
 
-      // Update history with the result
-      dispatch({
-        type: 'ADD_COMMAND',
-        payload: updatedCommand,
-      });
-
-      // Update repository state if command was successful
-      if (result.success && result.newRepo) {
-        dispatch({ type: 'SET_REPO', payload: result.newRepo });
+      if (result.clearHistory) {
+        dispatch({ type: 'CLEAR_HISTORY' });
       }
+
+      if (!result.clearHistory) {
+        dispatch({
+          type: 'ADD_COMMAND',
+          payload: updatedCommand,
+        });
+      }
+
+      recordCommandResult(currentLevel?.id ?? 1, result.success, commandInput);
+
+      dispatch({
+        type: 'APPLY_EXECUTION',
+        payload: {
+          currentRepo: result.newRepo,
+          currentDirectory: result.currentDirectory,
+          environment: result.environment,
+          aliases: result.aliases,
+          fileSystem: result.fileSystem,
+          lastExitCode: result.exitCode,
+        },
+      });
 
     } catch (error) {
       console.error('Command execution error:', error);
@@ -132,10 +178,15 @@ export function TerminalProvider({ children }: TerminalProviderProps) {
         args: [],
         output: 'Error: Command execution failed',
         success: false,
+        exitCode: 1,
+        cwd: terminalState.currentDirectory,
+        prompt: createPrompt(terminalState),
+        durationMs: Math.round(performance.now() - startedAt),
         timestamp: new Date(),
       };
 
       dispatch({ type: 'ADD_COMMAND', payload: errorCommand });
+      recordCommandResult(currentLevel?.id ?? 1, false, commandInput);
     } finally {
       dispatch({ type: 'SET_PROCESSING', payload: false });
     }
