@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM nginx:alpine-slim
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
