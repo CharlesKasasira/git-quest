@@ -125,6 +125,7 @@
   --quest-ink: #071018;
   --quest-panel: #0c1b27;
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   color: #e7fff0;
@@ -714,6 +715,7 @@ kbd {
 }
 
 .quest-command-preview:hover { border-color: var(--quest-green); }
+.quest-command-preview code { overflow-wrap: anywhere; }
 
 .quest-controls {
   position: absolute;
@@ -723,7 +725,7 @@ kbd {
   width: 122px;
   display: grid;
   grid-template-columns: repeat(3, 38px);
-  grid-template-rows: repeat(2, 38px);
+  grid-template-rows: repeat(3, 38px);
   gap: 4px;
 }
 
@@ -734,10 +736,16 @@ kbd {
   border: 1px solid #31505a;
   background: #0b1b24;
   box-shadow: 2px 2px 0 #020507;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .quest-controls button:hover { color: white; border-color: var(--quest-cyan); }
-.quest-controls button:first-child { grid-column: 2; }
+.quest-controls button:nth-child(1) { grid-column: 2; grid-row: 1; }
+.quest-controls button:nth-child(2) { grid-column: 1; grid-row: 2; }
+.quest-controls button:nth-child(3) { grid-column: 2; grid-row: 2; }
+.quest-controls button:nth-child(4) { grid-column: 3; grid-row: 2; }
+.quest-controls button:nth-child(5) { grid-column: 2; grid-row: 3; }
 .quest-control-action { color: #071018 !important; border-color: var(--quest-gold) !important; background: var(--quest-gold) !important; font-weight: 700; }
 
 .quest-key-legend {
@@ -858,6 +866,33 @@ kbd {
 .quest-command-help p { margin: 8px 0; line-height: 1.6; }
 .quest-command-help button { padding: 6px 8px; color: #03110a; border: 0; background: var(--quest-green); font-size: 9px; font-weight: 700; }
 
+.quest-command-help .quest-command-sequence {
+  display: grid;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 10px;
+  letter-spacing: normal;
+}
+
+.quest-command-help .quest-command-sequence button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-family: 'Space Mono', monospace;
+}
+
+.quest-command-help .quest-command-sequence button span {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  color: var(--quest-green);
+  background: #082414;
+  font-size: 8px;
+}
+
 .quest-terminal-history {
   min-height: 260px;
   max-height: 330px;
@@ -937,36 +972,289 @@ kbd {
 @keyframes quest-warning-blink { 50% { opacity: 0.48; } }
 @keyframes quest-music-pulse { 50% { opacity: 0.5; } }
 
-@media (max-width: 760px) {
-  .quest-title-screen { overflow-y: auto; }
+@media (max-width: 900px) {
+  .quest-title-screen {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding:
+      max(24px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(24px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+
   .quest-title-actions { flex-direction: column; align-items: stretch; }
+  .quest-title-actions .quest-pixel-button { width: 100%; }
   .quest-title-meta { flex-direction: column; gap: 9px; align-items: center; }
-  .quest-hud { grid-template-columns: auto 1fr auto auto; padding: 8px 10px; gap: 10px; }
+
+  .quest-game-shell {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .quest-hud {
+    position: sticky;
+    top: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 10px;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      8px
+      max(10px, env(safe-area-inset-left));
+  }
+
   .quest-stability { grid-column: 1 / -1; grid-row: 2; }
-  .quest-hud-mission strong { font-size: 8px; }
-  .quest-world-wrap { padding: 10px 8px 160px; align-items: start; }
-  .quest-room { width: 100%; margin-top: 15px; }
-  .quest-reactor { width: 82px; height: 82px; }
-  .quest-terminal-station { width: 58px; height: 48px; }
-  .quest-terminal-station svg { width: 20px; }
-  .quest-nova-body { width: 38px; height: 38px; }
-  .quest-player { transform: translate(-50%, -60%) scale(0.8); }
-  .quest-facing-left { transform: translate(-50%, -60%) scale(-0.8, 0.8); }
-  .quest-mission-card { left: 10px; right: 10px; bottom: 71px; width: auto; }
+  .quest-hud-mission { min-width: 0; }
+  .quest-hud-mission strong {
+    overflow: hidden;
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quest-world-wrap {
+    flex: none;
+    min-height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    place-items: stretch;
+    gap: 14px;
+    padding: 14px max(12px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .quest-room {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-height: none;
+    margin: 0;
+  }
+
+  .quest-reactor { width: 92px; height: 92px; }
+  .quest-reactor-ring { border-width: 5px; }
+
+  .quest-terminal-station {
+    width: 64px;
+    height: 54px;
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .quest-terminal-station svg { width: 21px; }
+  .quest-nova { min-width: 48px; min-height: 48px; }
+  .quest-nova-body { width: 42px; height: 42px; }
+  .quest-data-shard { min-width: 44px; min-height: 44px; justify-content: center; }
+  .quest-player { transform: translate(-50%, -60%) scale(0.82); }
+  .quest-facing-left { transform: translate(-50%, -60%) scale(-0.82, 0.82); }
+
+  .quest-mission-card {
+    position: static;
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+    padding: 15px 16px;
+  }
+
   .quest-mission-card h2 { font-size: 9px; }
-  .quest-controls { right: 10px; bottom: 8px; transform: scale(0.8); transform-origin: right bottom; }
+  .quest-notice { align-items: flex-start; }
+
+  .quest-controls {
+    position: static;
+    grid-column: 2;
+    align-self: end;
+    width: 164px;
+    display: grid;
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+    gap: 4px;
+    transform: none;
+  }
+
+  .quest-controls button { min-width: 52px; min-height: 52px; }
+  .quest-controls button svg { width: 24px; height: 24px; }
   .quest-key-legend { display: none; }
-  .quest-dialogue { grid-template-columns: 54px 1fr; padding: 14px; gap: 12px; }
+
+  .quest-dialogue-layer {
+    align-items: end;
+    padding:
+      12px
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+  }
+
+  .quest-dialogue {
+    max-height: min(80dvh, 620px);
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 12px;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
   .quest-dialogue-avatar { width: 50px; height: 50px; }
-  .quest-dialogue p { font-size: 11px; }
-  .quest-terminal-layer { padding: 8px; }
-  .quest-terminal-content { padding: 10px; }
-  .quest-terminal-task button { position: static; margin-top: 9px; }
-  .quest-terminal-history { min-height: 180px; max-height: 250px; }
-  .quest-terminal-form { align-items: stretch; flex-wrap: wrap; }
-  .quest-terminal-form input { order: 3; flex-basis: 100%; padding-top: 8px; }
-  .quest-complete-card { padding: 25px 15px; }
-  .quest-complete-card h2 { font-size: 20px; }
+  .quest-dialogue p { font-size: 12px; }
+  .quest-dialogue button { min-height: 44px; padding: 8px 0 8px 12px; }
+
+  .quest-terminal-layer { place-items: stretch; padding: 0; }
+
+  .quest-terminal-modal {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .quest-terminal-modal > header {
+    flex: 0 0 auto;
+    padding-top: max(7px, env(safe-area-inset-top));
+  }
+
+  .quest-terminal-content {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  .quest-terminal-task { flex: 0 0 auto; }
+  .quest-terminal-task h3 { padding-right: 0; font-size: 12px; }
+  .quest-terminal-task button { position: static; min-height: 40px; margin-top: 10px; }
+  .quest-command-help { flex: 0 0 auto; }
+  .quest-command-help .quest-command-sequence button { min-height: 40px; }
+
+  .quest-terminal-history {
+    min-height: 140px;
+    max-height: none;
+    flex: 1 1 auto;
+    padding: 13px 3px;
+  }
+
+  .quest-terminal-entry pre { margin-left: 0; overflow-wrap: anywhere; }
+
+  .quest-terminal-form {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .quest-terminal-form > span { grid-column: 1 / -1; font-size: 9px; }
+  .quest-terminal-form input {
+    min-height: 44px;
+    padding: 8px;
+    border: 1px solid #214b33;
+    background: #020806;
+    font-size: 16px;
+  }
+
+  .quest-terminal-form button { min-width: 64px; min-height: 44px; }
+
+  .quest-complete-layer {
+    place-items: stretch;
+    overflow-y: auto;
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+  }
+
+  .quest-complete-card { width: 100%; margin: auto; padding: 25px 16px; }
+  .quest-complete-card h2 { font-size: clamp(17px, 5vw, 24px); overflow-wrap: anywhere; }
+  .quest-complete-actions { flex-direction: column; }
+  .quest-complete-actions .quest-pixel-button { width: 100%; }
+
+  .quest-power-warning {
+    top: auto;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 599px) {
+  .quest-title-kicker { margin-bottom: 17px; font-size: 9px; }
+  .quest-logo-mark { width: 72px; height: 72px; transform: scale(0.84); margin-bottom: 8px; }
+  .quest-title-logo { font-size: clamp(38px, 15vw, 60px); }
+  .quest-title-copy { margin-bottom: 22px; font-size: 12px; }
+
+  .quest-hud { gap: 7px; }
+  .quest-icon-button { width: 36px; height: 36px; }
+  .quest-hud-mission span { font-size: 7px; }
+  .quest-hud-shards { padding: 7px 8px; }
+  .quest-hud-music { width: 36px; height: 36px; }
+
+  .quest-world-wrap { display: flex; flex-direction: column; gap: 12px; }
+  .quest-room { aspect-ratio: 4 / 3; }
+  .quest-room-label {
+    width: 78%;
+    overflow: hidden;
+    font-size: 5px;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .quest-mission-card { order: 2; }
+  .quest-controls {
+    order: 3;
+    align-self: center;
+    width: 188px;
+    grid-template-columns: repeat(3, 60px);
+    grid-template-rows: repeat(3, 60px);
+  }
+
+  .quest-controls button { min-width: 60px; min-height: 60px; }
+  .quest-interact-prompt { bottom: 7%; max-width: 85%; white-space: nowrap; }
+
+  .quest-dialogue { grid-template-columns: 42px minmax(0, 1fr); }
+  .quest-dialogue-avatar { width: 40px; height: 40px; }
+  .quest-dialogue-avatar svg { width: 24px; }
+
+  .quest-complete-icon { width: 60px; height: 60px; }
+  .quest-complete-recap { align-items: stretch; flex-direction: column; }
+  .quest-complete-recap span { justify-content: center; }
+}
+
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 600px) {
+  .quest-hud {
+    position: relative;
+    grid-template-columns: auto minmax(0, 1fr) minmax(170px, 0.6fr) auto auto;
+    min-height: 56px;
+    padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+  }
+
+  .quest-stability { grid-column: 3; grid-row: 1; }
+  .quest-world-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 32vw);
+    grid-template-rows: auto auto;
+    align-items: start;
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .quest-room { grid-column: 1; grid-row: 1 / 3; aspect-ratio: 16 / 9; }
+  .quest-mission-card { grid-column: 2; grid-row: 1; max-height: 205px; overflow-y: auto; }
+  .quest-controls {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    justify-self: center;
+    width: 134px;
+    grid-template-columns: repeat(3, 42px);
+    grid-template-rows: repeat(3, 42px);
+  }
+
+  .quest-controls button { min-width: 42px; min-height: 42px; }
+  .quest-dialogue-layer { align-items: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

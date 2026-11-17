@@ -25,7 +25,9 @@ import {
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useGame } from '../contexts/GameContext';
 import { useTerminal } from '../contexts/TerminalContext';
+import { getStoryChapter } from '../data/storyChapters';
 import { useChiptuneMusic } from '../hooks/useChiptuneMusic';
+import { LevelManager } from '../utils/levelManager';
 import AchievementToast from './AchievementToast';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -48,6 +50,7 @@ interface DataShard extends Position {
 }
 
 interface SavedAdventureState {
+  chapterId: number;
   player: Position;
   direction: Direction;
   hasMetNova: boolean;
@@ -103,6 +106,9 @@ const loadAdventureState = (): SavedAdventureState | null => {
       direction: ['up', 'down', 'left', 'right'].includes(direction ?? '')
         ? (direction as Direction)
         : 'up',
+      chapterId: Number.isInteger(raw.chapterId) && Number(raw.chapterId) >= 1 && Number(raw.chapterId) <= 5
+        ? Number(raw.chapterId)
+        : 1,
       hasMetNova: Boolean(raw.hasMetNova),
       collectedShards: Array.isArray(raw.collectedShards)
         ? raw.collectedShards.filter((id) => DATA_SHARDS.some((shard) => shard.id === id))
@@ -121,10 +127,11 @@ const loadAdventureState = (): SavedAdventureState | null => {
 };
 
 function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: AdventureGameProps) {
-  const { gameState, startLevel, completeLevel } = useGame();
+  const { gameState, startLevel, completeLevel, resetProgress } = useGame();
   const { terminalState, executeCommand, resetTerminal } = useTerminal();
   const { enabled: musicEnabled, playing: musicPlaying, start: startMusic, toggle: toggleMusic } = useChiptuneMusic();
   const [savedAdventure] = useState(loadAdventureState);
+  const [chapterId, setChapterId] = useState(savedAdventure?.chapterId ?? 1);
   const [player, setPlayer] = useState<Position>(savedAdventure?.player ?? START_POSITION);
   const [direction, setDirection] = useState<Direction>(savedAdventure?.direction ?? 'up');
   const [hasMetNova, setHasMetNova] = useState(savedAdventure?.hasMetNova ?? false);
@@ -136,8 +143,12 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
   const [showCommandHelp, setShowCommandHelp] = useState(savedAdventure?.showCommandHelp ?? false);
   const [missionComplete, setMissionComplete] = useState(savedAdventure?.missionComplete ?? false);
   const [hasStarted, setHasStarted] = useState(savedAdventure?.hasStarted ?? view === 'game');
+  const levelManager = useMemo(() => new LevelManager(), []);
 
   const repo = terminalState.currentRepo;
+  const currentLevel = gameState.levels.find((level) => level.id === chapterId) ?? gameState.levels[0];
+  const chapter = getStoryChapter(chapterId);
+  const nextLevel = gameState.levels.find((level) => level.id === chapterId + 1);
   const hasName = Boolean(repo.config.userName);
   const hasEmail = Boolean(repo.config.userEmail);
   const hasRunStatus = terminalState.history.some(
@@ -147,6 +158,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
 
   useEffect(() => {
     const state: SavedAdventureState = {
+      chapterId,
       player,
       direction,
       hasMetNova,
@@ -166,6 +178,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
       // Continue without persistence when storage is unavailable.
     }
   }, [
+    chapterId,
     collectedShards,
     dialogue,
     direction,
@@ -179,69 +192,116 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
     terminalOpen,
   ]);
 
+  const objectiveStatuses = useMemo(
+    () => currentLevel
+      ? levelManager.getObjectiveStatuses(currentLevel, repo, terminalState.history)
+      : [],
+    [currentLevel, levelManager, repo, terminalState.history]
+  );
+  const completedObjectiveCount = objectiveStatuses.filter((objective) => objective.completed).length;
+  const currentObjectiveIndex = Math.max(
+    0,
+    objectiveStatuses.findIndex((objective) => !objective.completed)
+  );
+
   const currentStep = useMemo(() => {
-    if (!hasMetNova) {
-      return {
-        number: 1,
-        title: 'Find the archive guardian',
-        detail: 'Move beside NOVA and press E to learn what happened here.',
-        command: null,
-        why: 'NOVA is the archive intelligence and your guide through the damaged timeline.',
-      };
-    }
-    if (!repo.initialized) {
-      return {
-        number: 2,
-        title: 'Power the timeline core',
-        detail: 'Reach the terminal in the upper-right corner and initialize the archive.',
-        command: 'git init',
-        why: 'git init creates the hidden repository where Git can begin recording history.',
-      };
-    }
-    if (!allShardsCollected) {
-      return {
-        number: 3,
-        title: `Recover the data shards (${collectedShards.length}/3)`,
-        detail: 'The restored power revealed unstable files. Move beside each shard and press E.',
-        command: null,
-        why: 'Files in a project exist before Git can decide whether to track them.',
-      };
-    }
-    if (!hasName) {
-      return {
-        number: 4,
-        title: 'Register your Timekeeper name',
-        detail: 'Return to the terminal and identify who will create this timeline’s history.',
-        command: 'git config --global user.name "Timekeeper"',
-        why: 'Git records an author on every commit, so collaborators know who made each change.',
-      };
-    }
-    if (!hasEmail) {
-      return {
-        number: 5,
-        title: 'Link your archive signal',
-        detail: 'Add an email identity to complete your Timekeeper profile.',
-        command: 'git config --global user.email "timekeeper@gitquest.dev"',
-        why: 'Git uses your name and email together to identify the author of future commits.',
-      };
-    }
-    if (!hasRunStatus) {
+    if (chapterId === 1) {
+      if (!hasMetNova) {
+        return {
+          number: 1,
+          total: 6,
+          title: 'Find the archive guardian',
+          detail: 'Move beside NOVA and press E to learn what happened here.',
+          commands: [] as string[],
+          why: 'NOVA is the archive intelligence and your guide through the damaged timeline.',
+        };
+      }
+      if (!repo.initialized) {
+        return {
+          number: 2,
+          total: 6,
+          title: 'Power the timeline core',
+          detail: 'Reach the terminal in the upper-right corner and initialize the archive.',
+          commands: chapter.guides[0]?.commands ?? ['git init'],
+          why: chapter.guides[0]?.why ?? '',
+        };
+      }
+      if (!allShardsCollected) {
+        return {
+          number: 3,
+          total: 6,
+          title: `Recover the data shards (${collectedShards.length}/3)`,
+          detail: 'The restored power revealed unstable files. Move beside each shard and press E.',
+          commands: [] as string[],
+          why: 'Files in a project exist before Git can decide whether to track them.',
+        };
+      }
+      if (!hasName) {
+        return {
+          number: 4,
+          total: 6,
+          title: 'Register your Timekeeper name',
+          detail: 'Return to the terminal and identify who will create this timeline’s history.',
+          commands: chapter.guides[1]?.commands ?? [],
+          why: chapter.guides[1]?.why ?? '',
+        };
+      }
+      if (!hasEmail) {
+        return {
+          number: 5,
+          total: 6,
+          title: 'Link your archive signal',
+          detail: 'Add an email identity to complete your Timekeeper profile.',
+          commands: chapter.guides[2]?.commands ?? [],
+          why: chapter.guides[2]?.why ?? '',
+        };
+      }
+      if (!hasRunStatus) {
+        return {
+          number: 6,
+          total: 6,
+          title: 'Scan the restored archive',
+          detail: 'Run a status scan to see the repository from Git’s point of view.',
+          commands: chapter.guides[3]?.commands ?? [],
+          why: chapter.guides[3]?.why ?? '',
+        };
+      }
       return {
         number: 6,
-        title: 'Scan the restored archive',
-        detail: 'Run a status scan to see the repository from Git’s point of view.',
-        command: 'git status',
-        why: 'git status is your safest navigation tool. It reports what changed and what Git expects next.',
+        total: 6,
+        title: 'Timeline stabilized',
+        detail: 'The archive remembers its origin again.',
+        commands: [] as string[],
+        why: chapter.completionSummary,
       };
     }
+
+    const objective = objectiveStatuses[currentObjectiveIndex];
+    const guide = chapter.guides[currentObjectiveIndex];
     return {
-      number: 6,
-      title: 'Timeline stabilized',
-      detail: 'The archive remembers its origin again.',
-      command: null,
-      why: 'You created a repository, registered its author, and inspected its state.',
+      number: Math.min(currentObjectiveIndex + 1, Math.max(1, objectiveStatuses.length)),
+      total: Math.max(1, objectiveStatuses.length),
+      title: objective?.objective ?? 'Timeline stabilized',
+      detail: objective?.completed
+        ? 'All chapter objectives are complete.'
+        : `Complete this operation inside ${chapter.sector}.`,
+      commands: guide?.commands ?? [],
+      why: guide?.why ?? currentLevel?.story ?? '',
     };
-  }, [allShardsCollected, collectedShards.length, hasEmail, hasMetNova, hasName, hasRunStatus, repo.initialized]);
+  }, [
+    allShardsCollected,
+    chapter,
+    chapterId,
+    collectedShards.length,
+    currentLevel?.story,
+    currentObjectiveIndex,
+    hasEmail,
+    hasMetNova,
+    hasName,
+    hasRunStatus,
+    objectiveStatuses,
+    repo.initialized,
+  ]);
 
   const nearestInteraction = useMemo(() => {
     if (isNear(player, NOVA_POSITION)) {
@@ -251,21 +311,23 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
       return { label: 'Use archive terminal', type: 'terminal' as const };
     }
     const shard = DATA_SHARDS.find(
-      (item) => !collectedShards.includes(item.id) && repo.initialized && isNear(player, item)
+      (item) => chapterId === 1 && !collectedShards.includes(item.id) && repo.initialized && isNear(player, item)
     );
     if (shard) {
       return { label: `Recover ${shard.label}`, type: 'shard' as const, shard };
     }
     return null;
-  }, [collectedShards, player, repo.initialized]);
+  }, [chapterId, collectedShards, player, repo.initialized]);
 
   const beginMission = useCallback(() => {
     void startMusic();
     const firstLevel = gameState.levels.find((level) => level.id === 1);
     if (firstLevel) {
+      resetProgress();
       startLevel(1);
       resetTerminal(firstLevel.initialRepo);
     }
+    setChapterId(1);
     setPlayer(START_POSITION);
     setDirection('up');
     setHasMetNova(false);
@@ -277,13 +339,40 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
     setNotice(DEFAULT_NOTICE);
     setHasStarted(true);
     onStartGame();
-  }, [gameState.levels, onStartGame, resetTerminal, startLevel, startMusic]);
+  }, [gameState.levels, onStartGame, resetProgress, resetTerminal, startLevel, startMusic]);
 
   const resumeMission = useCallback(() => {
     void startMusic();
+    startLevel(chapterId);
     setHasStarted(true);
     onStartGame();
-  }, [onStartGame, startMusic]);
+  }, [chapterId, onStartGame, startLevel, startMusic]);
+
+  const advanceChapter = useCallback(() => {
+    if (!nextLevel) return;
+
+    const nextRepo = {
+      ...nextLevel.initialRepo,
+      config: {
+        ...nextLevel.initialRepo.config,
+        ...repo.config,
+      },
+    };
+
+    startLevel(nextLevel.id);
+    resetTerminal(nextRepo);
+    setChapterId(nextLevel.id);
+    setPlayer(START_POSITION);
+    setDirection('up');
+    setHasMetNova(true);
+    setCollectedShards([]);
+    setTerminalOpen(false);
+    setTerminalInput('');
+    setShowCommandHelp(false);
+    setMissionComplete(false);
+    setDialogue(`NOVA // ${nextLevel.story}`);
+    setNotice(`Chapter ${String(nextLevel.id).padStart(2, '0')} online. Consult NOVA or enter the archive terminal.`);
+  }, [nextLevel, repo.config, resetTerminal, startLevel]);
 
   const movePlayer = useCallback(
     (nextDirection: Direction) => {
@@ -321,16 +410,18 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
     if (nearestInteraction.type === 'nova') {
       setHasMetNova(true);
       setDialogue(
-        repo.initialized
-          ? 'NOVA // The core is awake. Recover the three data shards, then register your identity at the terminal.'
-          : 'NOVA // Timekeeper, this archive has no origin point. Reach the terminal and run git init. That command will give this timeline a memory.'
+        chapterId === 1
+          ? repo.initialized
+            ? 'NOVA // The core is awake. Recover the three data shards, then register your identity at the terminal.'
+            : 'NOVA // Timekeeper, this archive has no origin point. Reach the terminal and run git init. That command will give this timeline a memory.'
+          : `NOVA // ${currentLevel?.story ?? chapter.completionSummary}`
       );
-      setNotice('Mission updated: reach the archive terminal.');
+      setNotice(chapterId === 1 ? 'Mission updated: reach the archive terminal.' : `Mission briefing loaded for ${chapter.sector}.`);
       return;
     }
 
     if (nearestInteraction.type === 'terminal') {
-      if (repo.initialized && !allShardsCollected) {
+      if (chapterId === 1 && repo.initialized && !allShardsCollected) {
         setDialogue('NOVA // The core is online, but three data shards remain unstable. Recover them before continuing.');
         return;
       }
@@ -344,7 +435,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
     setCollectedShards((current) => [...current, shard.id]);
     setDialogue(`DATA RECOVERED // ${shard.label} is stable and ready to be tracked.`);
     setNotice(`Recovered ${shard.label}. ${collectedShards.length + 1}/3 shards secured.`);
-  }, [allShardsCollected, collectedShards.length, dialogue, missionComplete, nearestInteraction, repo.initialized, terminalOpen, view]);
+  }, [allShardsCollected, chapter.completionSummary, chapter.sector, chapterId, collectedShards.length, currentLevel?.story, dialogue, missionComplete, nearestInteraction, repo.initialized, terminalOpen, view]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -379,32 +470,31 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
   }, [interact, movePlayer, view]);
 
   useEffect(() => {
-    if (repo.initialized && terminalOpen && !allShardsCollected) {
+    if (chapterId === 1 && repo.initialized && terminalOpen && !allShardsCollected) {
       setTerminalOpen(false);
       setDialogue('SYSTEM // Repository initialized. Archive power restored. Three data shards have appeared in the chamber.');
       setNotice('Core online. Recover all three glowing data shards.');
     }
-  }, [allShardsCollected, repo.initialized, terminalOpen]);
+  }, [allShardsCollected, chapterId, repo.initialized, terminalOpen]);
 
   useEffect(() => {
-    if (
-      hasStarted &&
-      repo.initialized &&
-      allShardsCollected &&
-      hasName &&
-      hasEmail &&
-      hasRunStatus &&
-      !missionComplete
-    ) {
+    const levelIsComplete = currentLevel
+      ? levelManager.checkLevelCompletion(currentLevel, repo, terminalState.history)
+      : false;
+    const storyRequirementsComplete = chapterId === 1
+      ? levelIsComplete && allShardsCollected
+      : levelIsComplete;
+
+    if (hasStarted && storyRequirementsComplete && !missionComplete) {
       const timer = window.setTimeout(() => {
         setTerminalOpen(false);
         setMissionComplete(true);
-        completeLevel(1);
+        completeLevel(chapterId);
       }, 500);
       return () => window.clearTimeout(timer);
     }
     return undefined;
-  }, [allShardsCollected, completeLevel, hasEmail, hasName, hasRunStatus, hasStarted, missionComplete, repo.initialized]);
+  }, [allShardsCollected, chapterId, completeLevel, currentLevel, hasStarted, levelManager, missionComplete, repo, terminalState.history]);
 
   const submitCommand = async (event: FormEvent) => {
     event.preventDefault();
@@ -416,7 +506,11 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
   };
 
   const latestHistory = terminalState.history.slice(-5);
-  const stability = [repo.initialized, allShardsCollected, hasName, hasEmail, hasRunStatus].filter(Boolean).length * 20;
+  const stability = chapterId === 1
+    ? [repo.initialized, allShardsCollected, hasName, hasEmail, hasRunStatus].filter(Boolean).length * 20
+    : currentLevel
+      ? levelManager.getCompletionPercentage(currentLevel, repo, terminalState.history)
+      : 0;
 
   if (view === 'home') {
     return (
@@ -462,7 +556,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
           </div>
           <div className="quest-title-meta">
             <span><Gamepad2 size={14} /> Story-driven Git adventure</span>
-            <span>Chapter 01 // Initialize the Timeline</span>
+            <span>5 chapters // One complete timeline</span>
           </div>
         </div>
         <div className="quest-scanline" aria-hidden="true" />
@@ -471,20 +565,25 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
   }
 
   return (
-    <main className={`quest-game-shell ${repo.initialized ? 'quest-powered' : 'quest-unpowered'} ${hasRunStatus ? 'quest-stable' : ''}`}>
+    <main className={`quest-game-shell ${repo.initialized ? 'quest-powered' : 'quest-unpowered'} ${stability === 100 ? 'quest-stable' : ''}`}>
       <header className="quest-hud">
         <button className="quest-icon-button" onClick={onGoHome} aria-label="Return to home page">
           <ArrowLeft size={18} />
         </button>
         <div className="quest-hud-mission">
-          <span>CHAPTER 01</span>
-          <strong>INITIALIZE THE TIMELINE</strong>
+          <span>CHAPTER {String(chapterId).padStart(2, '0')} / {gameState.levels.length}</span>
+          <strong>{currentLevel?.title.toUpperCase() ?? 'SAVE THE TIMELINE'}</strong>
         </div>
         <div className="quest-stability">
           <div className="quest-stability-label"><Radar size={14} /> Timeline stability <strong>{stability}%</strong></div>
           <div className="quest-meter"><span style={{ width: `${stability}%` }} /></div>
         </div>
-        <div className="quest-hud-shards"><FileCode2 size={15} /> {collectedShards.length}/3</div>
+        <div className="quest-hud-shards">
+          <FileCode2 size={15} />
+          {chapterId === 1
+            ? `${collectedShards.length}/3`
+            : `${completedObjectiveCount}/${objectiveStatuses.length}`}
+        </div>
         <button
           className={`quest-hud-music ${musicPlaying ? 'is-playing' : ''}`}
           onClick={() => void toggleMusic()}
@@ -536,7 +635,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
             <span className="quest-nova-name">NOVA</span>
           </button>
 
-          {DATA_SHARDS.map((shard) => {
+          {chapterId === 1 && DATA_SHARDS.map((shard) => {
             const collected = collectedShards.includes(shard.id);
             return repo.initialized ? (
               <button
@@ -571,23 +670,23 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
             </div>
           )}
 
-          <div className="quest-room-label">CHRONO ARCHIVE // ORIGIN CHAMBER</div>
+          <div className="quest-room-label">{chapter.roomLabel}</div>
           <div className="quest-scanline" aria-hidden="true" />
         </div>
 
         <aside className="quest-mission-card">
-          <div className="quest-mission-step">MISSION STEP {currentStep.number} / 6</div>
+          <div className="quest-mission-step">MISSION STEP {currentStep.number} / {currentStep.total}</div>
           <h2>{currentStep.title}</h2>
           <p>{currentStep.detail}</p>
-          {currentStep.command && (
+          {currentStep.commands[0] && (
             <button
               className="quest-command-preview"
               onClick={() => {
-                setTerminalInput(currentStep.command ?? '');
+                setTerminalInput(currentStep.commands[0] ?? '');
                 setShowCommandHelp(true);
               }}
             >
-              <Terminal size={15} /> <code>{currentStep.command}</code>
+              <Terminal size={15} /> <code>{currentStep.commands[0]}</code>
             </button>
           )}
           <div className="quest-notice"><Zap size={13} /> {notice}</div>
@@ -642,10 +741,14 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
                 <div className="quest-command-help">
                   <div><Sparkles size={17} /> <strong>WHY THIS MATTERS</strong></div>
                   <p>{currentStep.why}</p>
-                  {currentStep.command && (
-                    <button onClick={() => setTerminalInput(currentStep.command ?? '')}>
-                      Put command in terminal
-                    </button>
+                  {currentStep.commands.length > 0 && (
+                    <div className="quest-command-sequence">
+                      {currentStep.commands.map((command, index) => (
+                        <button key={command} onClick={() => setTerminalInput(command)}>
+                          <span>{index + 1}</span> {command}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
@@ -673,7 +776,7 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
                   autoFocus
                   value={terminalInput}
                   onChange={(event) => setTerminalInput(event.target.value)}
-                  placeholder={currentStep.command ?? 'Enter a Git command'}
+                  placeholder={currentStep.commands[0] ?? 'Enter a Git command'}
                   disabled={terminalState.isProcessing}
                   aria-label="Git command"
                 />
@@ -690,28 +793,42 @@ function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: Adventure
         <div className="quest-complete-layer">
           <section className="quest-complete-card">
             <div className="quest-complete-icon"><Sparkles size={35} /></div>
-            <span className="quest-complete-kicker">TIMELINE RESTORED</span>
-            <h2>ORIGIN<br />REMEMBERED</h2>
-            <p>You gave the archive a repository, recovered its files, registered an author, and inspected its state.</p>
+            <span className="quest-complete-kicker">
+              {nextLevel ? `CHAPTER ${String(chapterId).padStart(2, '0')} COMPLETE` : 'TIMELINE RESTORED'}
+            </span>
+            <h2>{chapter.completionTitle}</h2>
+            <p>{chapter.completionSummary}</p>
             <div className="quest-complete-recap">
-              <span><Check /> Repository initialized</span>
-              <span><Check /> Identity configured</span>
-              <span><Check /> Archive scanned</span>
+              <span><Check /> {currentLevel?.title}</span>
+              <span><Check /> {objectiveStatuses.length} objectives cleared</span>
+              <span><Check /> {stability}% stability</span>
             </div>
             <div className="quest-complete-actions">
-              <button className="quest-pixel-button quest-pixel-button-primary" onClick={onOpenClassic}>
-                Continue in terminal mode
-              </button>
-              <button className="quest-pixel-button" onClick={beginMission}>
-                <RotateCcw size={16} /> Replay chapter
-              </button>
+              {nextLevel ? (
+                <button className="quest-pixel-button quest-pixel-button-primary" onClick={advanceChapter}>
+                  Begin chapter {String(nextLevel.id).padStart(2, '0')} <ChevronRight size={16} />
+                </button>
+              ) : (
+                <>
+                  <button className="quest-pixel-button quest-pixel-button-primary" onClick={onGoHome}>
+                    Return to title
+                  </button>
+                  <button className="quest-pixel-button" onClick={beginMission}>
+                    <RotateCcw size={16} /> Replay full story
+                  </button>
+                </>
+              )}
             </div>
-            <small>CHAPTER 02 // SECURE THE SOURCE — COMING NEXT</small>
+            <small>
+              {nextLevel
+                ? `NEXT // CHAPTER ${String(nextLevel.id).padStart(2, '0')} — ${nextLevel.title.toUpperCase()}`
+                : 'CAMPAIGN COMPLETE // ALL FIVE CHAPTERS RESTORED'}
+            </small>
           </section>
         </div>
       )}
 
-      {!repo.initialized && hasMetNova && (
+      {chapterId === 1 && !repo.initialized && hasMetNova && (
         <div className="quest-power-warning"><LockKeyhole size={14} /> ARCHIVE POWER OFFLINE</div>
       )}
       <AchievementToast />
