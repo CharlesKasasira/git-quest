@@ -28,11 +28,13 @@ import { useTerminal } from '../contexts/TerminalContext';
 import { useChiptuneMusic } from '../hooks/useChiptuneMusic';
 import AchievementToast from './AchievementToast';
 
-type Screen = 'title' | 'game';
 type Direction = 'up' | 'down' | 'left' | 'right';
 
 interface AdventureGameProps {
+  view: 'home' | 'game';
+  onStartGame: () => void;
   onOpenClassic: () => void;
+  onGoHome: () => void;
 }
 
 interface Position {
@@ -46,7 +48,6 @@ interface DataShard extends Position {
 }
 
 interface SavedAdventureState {
-  screen: Screen;
   player: Position;
   direction: Direction;
   hasMetNova: boolean;
@@ -92,7 +93,6 @@ const loadAdventureState = (): SavedAdventureState | null => {
     const direction = raw.direction;
 
     return {
-      screen: raw.screen === 'game' ? 'game' : 'title',
       player:
         player && Number.isFinite(player.x) && Number.isFinite(player.y)
           ? {
@@ -120,12 +120,11 @@ const loadAdventureState = (): SavedAdventureState | null => {
   }
 };
 
-function AdventureGame({ onOpenClassic }: AdventureGameProps) {
+function AdventureGame({ view, onStartGame, onOpenClassic, onGoHome }: AdventureGameProps) {
   const { gameState, startLevel, completeLevel } = useGame();
   const { terminalState, executeCommand, resetTerminal } = useTerminal();
   const { enabled: musicEnabled, playing: musicPlaying, start: startMusic, toggle: toggleMusic } = useChiptuneMusic();
   const [savedAdventure] = useState(loadAdventureState);
-  const [screen, setScreen] = useState<Screen>(savedAdventure?.screen ?? 'title');
   const [player, setPlayer] = useState<Position>(savedAdventure?.player ?? START_POSITION);
   const [direction, setDirection] = useState<Direction>(savedAdventure?.direction ?? 'up');
   const [hasMetNova, setHasMetNova] = useState(savedAdventure?.hasMetNova ?? false);
@@ -136,7 +135,7 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
   const [terminalInput, setTerminalInput] = useState(savedAdventure?.terminalInput ?? '');
   const [showCommandHelp, setShowCommandHelp] = useState(savedAdventure?.showCommandHelp ?? false);
   const [missionComplete, setMissionComplete] = useState(savedAdventure?.missionComplete ?? false);
-  const [hasStarted, setHasStarted] = useState(savedAdventure?.hasStarted ?? false);
+  const [hasStarted, setHasStarted] = useState(savedAdventure?.hasStarted ?? view === 'game');
 
   const repo = terminalState.currentRepo;
   const hasName = Boolean(repo.config.userName);
@@ -148,7 +147,6 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
 
   useEffect(() => {
     const state: SavedAdventureState = {
-      screen,
       player,
       direction,
       hasMetNova,
@@ -176,7 +174,6 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
     missionComplete,
     notice,
     player,
-    screen,
     showCommandHelp,
     terminalInput,
     terminalOpen,
@@ -278,13 +275,19 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
     setTerminalInput('');
     setMissionComplete(false);
     setNotice(DEFAULT_NOTICE);
-    setScreen('game');
     setHasStarted(true);
-  }, [gameState.levels, resetTerminal, startLevel, startMusic]);
+    onStartGame();
+  }, [gameState.levels, onStartGame, resetTerminal, startLevel, startMusic]);
+
+  const resumeMission = useCallback(() => {
+    void startMusic();
+    setHasStarted(true);
+    onStartGame();
+  }, [onStartGame, startMusic]);
 
   const movePlayer = useCallback(
     (nextDirection: Direction) => {
-      if (screen !== 'game' || terminalOpen || dialogue || missionComplete) return;
+      if (view !== 'game' || terminalOpen || dialogue || missionComplete) return;
 
       setDirection(nextDirection);
       setPlayer((current) => {
@@ -300,11 +303,11 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
         };
       });
     },
-    [dialogue, missionComplete, screen, terminalOpen]
+    [dialogue, missionComplete, terminalOpen, view]
   );
 
   const interact = useCallback(() => {
-    if (screen !== 'game' || terminalOpen || missionComplete) return;
+    if (view !== 'game' || terminalOpen || missionComplete) return;
     if (dialogue) {
       setDialogue(null);
       return;
@@ -341,11 +344,11 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
     setCollectedShards((current) => [...current, shard.id]);
     setDialogue(`DATA RECOVERED // ${shard.label} is stable and ready to be tracked.`);
     setNotice(`Recovered ${shard.label}. ${collectedShards.length + 1}/3 shards secured.`);
-  }, [allShardsCollected, collectedShards.length, dialogue, missionComplete, nearestInteraction, repo.initialized, screen, terminalOpen]);
+  }, [allShardsCollected, collectedShards.length, dialogue, missionComplete, nearestInteraction, repo.initialized, terminalOpen, view]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (screen !== 'game') return;
+      if (view !== 'game') return;
       const target = event.target as HTMLElement | null;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
@@ -373,7 +376,7 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [interact, movePlayer, screen]);
+  }, [interact, movePlayer, view]);
 
   useEffect(() => {
     if (repo.initialized && terminalOpen && !allShardsCollected) {
@@ -415,7 +418,7 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
   const latestHistory = terminalState.history.slice(-5);
   const stability = [repo.initialized, allShardsCollected, hasName, hasEmail, hasRunStatus].filter(Boolean).length * 20;
 
-  if (screen === 'title') {
+  if (view === 'home') {
     return (
       <main className="quest-title-screen">
         <div className="quest-stars" aria-hidden="true" />
@@ -434,9 +437,17 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
             History has fractured. Enter the Chrono Archive, recover its lost files, and master the commands that hold reality together.
           </p>
           <div className="quest-title-actions">
-            <button className="quest-pixel-button quest-pixel-button-primary" onClick={beginMission}>
-              <Play size={18} fill="currentColor" /> Begin story mode
+            <button
+              className="quest-pixel-button quest-pixel-button-primary"
+              onClick={hasStarted ? resumeMission : beginMission}
+            >
+              <Play size={18} fill="currentColor" /> {hasStarted ? 'Continue story mode' : 'Begin story mode'}
             </button>
+            {hasStarted && (
+              <button className="quest-pixel-button" onClick={beginMission}>
+                <RotateCcw size={18} /> New story
+              </button>
+            )}
             <button className="quest-pixel-button" onClick={onOpenClassic}>
               <Keyboard size={18} /> Open terminal mode
             </button>
@@ -462,7 +473,7 @@ function AdventureGame({ onOpenClassic }: AdventureGameProps) {
   return (
     <main className={`quest-game-shell ${repo.initialized ? 'quest-powered' : 'quest-unpowered'} ${hasRunStatus ? 'quest-stable' : ''}`}>
       <header className="quest-hud">
-        <button className="quest-icon-button" onClick={() => setScreen('title')} aria-label="Return to title screen">
+        <button className="quest-icon-button" onClick={onGoHome} aria-label="Return to home page">
           <ArrowLeft size={18} />
         </button>
         <div className="quest-hud-mission">

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import TimelinePanel from './TimelinePanel';
 import TerminalPanel from './TerminalPanel';
 import GameHeader from './GameHeader';
@@ -11,29 +11,34 @@ import { useGame } from '../contexts/GameContext';
 import { useMultiplayer } from '../contexts/MultiplayerContext';
 import { Eye, X, Wifi, WifiOff } from 'lucide-react';
 
+type AppRoute = 'home' | 'game' | 'terminal';
+
+const getRouteFromPath = (): AppRoute => {
+  if (window.location.pathname.startsWith('/terminal')) return 'terminal';
+  if (window.location.pathname.startsWith('/game')) return 'game';
+  return 'home';
+};
+
 const GameLayout = memo(function GameLayout() {
   const { gameState } = useGame();
   const { multiplayerState } = useMultiplayer();
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const [showVisualPanel, setShowVisualPanel] = useState(false);
   const [showMultiplayerPanel, setShowMultiplayerPanel] = useState(false);
-  const [experience, setExperience] = useState<'adventure' | 'classic'>(() => {
-    try {
-      return window.localStorage.getItem('git-quest-experience') === 'classic'
-        ? 'classic'
-        : 'adventure';
-    } catch {
-      return 'adventure';
-    }
-  });
+  const [route, setRoute] = useState<AppRoute>(getRouteFromPath);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem('git-quest-experience', experience);
-    } catch {
-      // Continue without persistence when storage is unavailable.
+    const handlePopState = () => setRoute(getRouteFromPath());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = useCallback((path: '/' | '/game' | '/terminal') => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
     }
-  }, [experience]);
+    setRoute(getRouteFromPath());
+  }, []);
 
   // Keyboard navigation to focus terminal
   useEffect(() => {
@@ -53,8 +58,15 @@ const GameLayout = memo(function GameLayout() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  if (experience === 'adventure') {
-    return <AdventureGame onOpenClassic={() => setExperience('classic')} />;
+  if (route === 'home' || route === 'game') {
+    return (
+      <AdventureGame
+        view={route}
+        onStartGame={() => navigate('/game')}
+        onOpenClassic={() => navigate('/terminal')}
+        onGoHome={() => navigate('/')}
+      />
+    );
   }
 
   return (
@@ -76,10 +88,10 @@ const GameLayout = memo(function GameLayout() {
       {/* Control Buttons */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col space-y-2">
         <button
-          onClick={() => setExperience('adventure')}
+          onClick={() => navigate('/')}
           className="flex items-center space-x-2 px-4 py-2 bg-black text-terminal-primary rounded border border-terminal-primary hover:bg-terminal-primary hover:text-black transition-all"
         >
-          <span className="text-sm font-mono">Story Mode</span>
+          <span className="text-sm font-mono">Home</span>
         </button>
         {/* Visual Learning Panel Toggle */}
         <button

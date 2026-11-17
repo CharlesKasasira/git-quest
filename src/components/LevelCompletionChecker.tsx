@@ -11,7 +11,7 @@ function LevelCompletionChecker() {
   const { terminalState, resetTerminal } = useTerminal();
   const [showCompletion, setShowCompletion] = useState(false);
   const [completedLevel, setCompletedLevel] = useState<Level | null>(null);
-  const [lastLevelId, setLastLevelId] = useState<number | null>(null);
+  const [lastLevelId, setLastLevelId] = useState<number | null>(gameState.currentLevel);
   const levelManager = useMemo(() => new LevelManager(), []);
   const nextLevel = gameState.levels.find(level => level.id === gameState.currentLevel + 1);
   const levelScore =

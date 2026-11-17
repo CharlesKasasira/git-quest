@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Git Quest: Save the Timeline</title>
+  <desc id="description">A social card for an interactive game that teaches Git</desc>
+  <defs>
+    <linearGradient id="background" x1="80" y1="36" x2="1110" y2="594" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0c1b27" />
+      <stop offset="1" stop-color="#020406" />
+    </linearGradient>
+    <radialGradient id="aura" cx="0" cy="0" r="1" gradientTransform="translate(340 300) rotate(90) scale(320)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14695f" stop-opacity=".42" />
+      <stop offset="1" stop-color="#03070c" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0v42" fill="none" stroke="#55e6ff" stroke-opacity=".08" />
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)" />
+  <rect width="1200" height="630" fill="url(#aura)" />
+  <rect y="360" width="1200" height="270" fill="url(#grid)" />
+  <path d="M0 559h1200" stroke="#55e6ff" stroke-opacity=".16" />
+
+  <g transform="translate(105 168)">
+    <rect width="260" height="260" rx="58" fill="#071018" stroke="#285564" stroke-width="5" />
+    <g fill="none" stroke="#73ff9f" stroke-linecap="round" stroke-linejoin="round" stroke-width="21" filter="url(#glow)">
+      <path d="M96 68v126" />
+      <path d="M106 126h39c30 0 43-18 43-45V66" />
+    </g>
+    <g fill="#071018" stroke-width="15">
+      <circle cx="96" cy="60" r="25" stroke="#73ff9f" />
+      <circle cx="96" cy="201" r="25" stroke="#73ff9f" />
+      <circle cx="188" cy="60" r="25" stroke="#55e6ff" />
+    </g>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="435" y="155" fill="#55e6ff" font-size="22" font-weight="700" letter-spacing="5">CHRONO ARCHIVE // ONLINE</text>
+    <text x="430" y="268" fill="#e7fff0" font-size="92" font-weight="800" letter-spacing="-3">GIT QUEST</text>
+    <text x="435" y="330" fill="#73ff9f" font-size="34" font-weight="700" letter-spacing="7">SAVE THE TIMELINE</text>
+    <text x="435" y="404" fill="#b5cbd2" font-size="26">Learn Git through an interactive</text>
+    <text x="435" y="442" fill="#b5cbd2" font-size="26">terminal adventure.</text>
+    <g font-size="17" font-weight="700" letter-spacing="2">
+      <rect x="435" y="492" width="148" height="44" rx="5" fill="#73ff9f" fill-opacity=".1" stroke="#73ff9f" stroke-opacity=".55" />
+      <text x="461" y="521" fill="#73ff9f">BRANCH</text>
+      <rect x="598" y="492" width="148" height="44" rx="5" fill="#55e6ff" fill-opacity=".08" stroke="#55e6ff" stroke-opacity=".55" />
+      <text x="627" y="521" fill="#55e6ff">COMMIT</text>
+      <rect x="761" y="492" width="138" height="44" rx="5" fill="#ffd166" fill-opacity=".08" stroke="#ffd166" stroke-opacity=".55" />
+      <text x="790" y="521" fill="#ffd166">MERGE</text>
+    </g>
+    <text x="105" y="584" fill="#7d9aa5" font-size="19" letter-spacing="2">GIT-QUEST-IOTA.VERCEL.APP</text>
+  </g>
+  <circle cx="1082" cy="82" r="3" fill="#73ff9f" />
+  <circle cx="1026" cy="122" r="2" fill="#55e6ff" />
+  <circle cx="1120" cy="186" r="2" fill="#73ff9f" />
+</svg>
