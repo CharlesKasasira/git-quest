@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 import { TerminalState, TerminalCommand, GitRepository } from '../types/game';
 import { createDefaultEnvironment, createDefaultFileSystem, createPrompt, runBashScript } from '../utils/bashTerminal';
 import { GitSimulator } from '../utils/gitSimulator';
@@ -20,6 +20,7 @@ type TerminalAction =
   | { type: 'RESET'; payload: GitRepository };
 
 const initialEnvironment = createDefaultEnvironment();
+const TERMINAL_STORAGE_KEY = 'git-quest-terminal-state';
 
 const initialTerminalState: TerminalState = {
   history: [],
@@ -32,7 +33,7 @@ const initialTerminalState: TerminalState = {
     config: {},
     workingDirectory: '/timeline-project',
   },
-  currentDirectory: initialEnvironment.HOME ?? '/timeline-project',
+  currentDirectory: initialEnvironment['HOME'] ?? '/timeline-project',
   environment: initialEnvironment,
   aliases: {
     gs: 'git status',
@@ -41,6 +42,65 @@ const initialTerminalState: TerminalState = {
   fileSystem: createDefaultFileSystem(),
   lastExitCode: 0,
   isProcessing: false,
+};
+
+const hydrateTerminalState = (saved: unknown): TerminalState => {
+  if (!saved || typeof saved !== 'object') return initialTerminalState;
+
+  const raw = saved as Partial<TerminalState>;
+  const rawRepo = raw.currentRepo;
+  const currentRepo: GitRepository = rawRepo
+    ? {
+        ...rawRepo,
+        commits: (rawRepo.commits ?? []).map((commit) => ({
+          ...commit,
+          timestamp: new Date(commit.timestamp),
+        })),
+        branches: (rawRepo.branches ?? []).map((branch) => ({
+          ...branch,
+          commits: (branch.commits ?? []).map((commit) => ({
+            ...commit,
+            timestamp: new Date(commit.timestamp),
+          })),
+        })),
+        ...(rawRepo.tags
+          ? {
+              tags: rawRepo.tags.map((tag) => ({
+                ...tag,
+                createdAt: new Date(tag.createdAt),
+              })),
+            }
+          : {}),
+      }
+    : initialTerminalState.currentRepo;
+
+  return {
+    ...initialTerminalState,
+    currentRepo,
+    history: (raw.history ?? []).map((entry) => ({
+      ...entry,
+      timestamp: new Date(entry.timestamp),
+    })),
+    currentDirectory: raw.currentDirectory ?? currentRepo.workingDirectory,
+    environment: raw.environment ?? initialTerminalState.environment,
+    aliases: raw.aliases ?? initialTerminalState.aliases,
+    fileSystem: (raw.fileSystem ?? initialTerminalState.fileSystem).map((entry) => ({
+      ...entry,
+      createdAt: new Date(entry.createdAt),
+      updatedAt: new Date(entry.updatedAt),
+    })),
+    lastExitCode: raw.lastExitCode ?? 0,
+    isProcessing: false,
+  };
+};
+
+const loadTerminalState = (): TerminalState => {
+  try {
+    const saved = window.localStorage.getItem(TERMINAL_STORAGE_KEY);
+    return saved ? hydrateTerminalState(JSON.parse(saved)) : initialTerminalState;
+  } catch {
+    return initialTerminalState;
+  }
 };
 
 function terminalReducer(state: TerminalState, action: TerminalAction): TerminalState {
@@ -107,9 +167,24 @@ interface TerminalProviderProps {
 }
 
 export function TerminalProvider({ children }: TerminalProviderProps) {
-  const [terminalState, dispatch] = useReducer(terminalReducer, initialTerminalState);
+  const [terminalState, dispatch] = useReducer(
+    terminalReducer,
+    initialTerminalState,
+    loadTerminalState
+  );
   const gitSimulator = new GitSimulator();
   const { currentLevel, recordCommandResult } = useGame();
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        TERMINAL_STORAGE_KEY,
+        JSON.stringify({ ...terminalState, isProcessing: false })
+      );
+    } catch {
+      // Continue without persistence when storage is unavailable.
+    }
+  }, [terminalState]);
 
   const executeCommand = async (commandInput: string): Promise<void> => {
     dispatch({ type: 'SET_PROCESSING', payload: true });

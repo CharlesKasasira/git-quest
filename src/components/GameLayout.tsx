@@ -6,6 +6,7 @@ import LevelCompletionChecker from './LevelCompletionChecker';
 import VisualPanel from './visual/VisualPanel';
 import MultiplayerPanel from './multiplayer/MultiplayerPanel';
 import AchievementToast from './AchievementToast';
+import AdventureGame from './AdventureGame';
 import { useGame } from '../contexts/GameContext';
 import { useMultiplayer } from '../contexts/MultiplayerContext';
 import { Eye, X, Wifi, WifiOff } from 'lucide-react';
@@ -16,6 +17,23 @@ const GameLayout = memo(function GameLayout() {
   const terminalInputRef = useRef<HTMLInputElement>(null);
   const [showVisualPanel, setShowVisualPanel] = useState(false);
   const [showMultiplayerPanel, setShowMultiplayerPanel] = useState(false);
+  const [experience, setExperience] = useState<'adventure' | 'classic'>(() => {
+    try {
+      return window.localStorage.getItem('git-quest-experience') === 'classic'
+        ? 'classic'
+        : 'adventure';
+    } catch {
+      return 'adventure';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('git-quest-experience', experience);
+    } catch {
+      // Continue without persistence when storage is unavailable.
+    }
+  }, [experience]);
 
   // Keyboard navigation to focus terminal
   useEffect(() => {
@@ -35,6 +53,10 @@ const GameLayout = memo(function GameLayout() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  if (experience === 'adventure') {
+    return <AdventureGame onOpenClassic={() => setExperience('classic')} />;
+  }
+
   return (
     <div className="min-h-screen bg-terminal-bg text-terminal-text">
       <GameHeader />
@@ -53,6 +75,12 @@ const GameLayout = memo(function GameLayout() {
       
       {/* Control Buttons */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col space-y-2">
+        <button
+          onClick={() => setExperience('adventure')}
+          className="flex items-center space-x-2 px-4 py-2 bg-black text-terminal-primary rounded border border-terminal-primary hover:bg-terminal-primary hover:text-black transition-all"
+        >
+          <span className="text-sm font-mono">Story Mode</span>
+        </button>
         {/* Visual Learning Panel Toggle */}
         <button
           onClick={() => setShowVisualPanel(!showVisualPanel)}
